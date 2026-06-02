@@ -1,0 +1,37 @@
+# [Your Organization] Standard Gitignore - Hardened
+
+# Logs and temporals
+*.log
+*.tmp
+*.bak
+cargo_*.txt
+debug_*.txt
+
+# Environment and Secrets
+.env
+.env.*
+*.local
+.manifests/
+
+# Build artifacts
+target/
+dist/
+build/
+bin/
+__pycache__/
+*.pyc
+.pytest_cache/
+node_modules/
+.next/
+.serverless/
+
+# IDE and System
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.DS_Store
+Thumbs.db
+desktop.ini
