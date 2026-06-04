@@ -5,6 +5,8 @@ Format: [keepachangelog.com](https://keepachangelog.com) · Versioning: [semver.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-04
+
 ### Added
 
 - Updated TUI themes to use `Color::Reset` for backgrounds, preserving the terminal's native background colors and transparency.
