@@ -57,9 +57,9 @@ impl Default for AppConfig {
         model_limits.insert("deepseek-reasoner".to_string(), 50);
         model_limits.insert("gpt-oss".to_string(), 100);
         model_limits.insert("gemini-3.5-flash".to_string(), 1500);
-        model_limits.insert("gemini-3.1-pro".to_string(), 150);
+        model_limits.insert("gemini-3.1-pro".to_string(), 50);
         model_limits.insert("Gemini 3.5 Flash".to_string(), 1500);
-        model_limits.insert("Gemini 3.1 Pro".to_string(), 150);
+        model_limits.insert("Gemini 3.1 Pro".to_string(), 50);
         model_limits.insert("claude-4.7".to_string(), 150);
 
         Self {

@@ -165,7 +165,6 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     // Summary Card (System Status)
     let mut summary_rows = Vec::new();
     let mut total_requests = 0;
-    let mut total_remaining = 0;
     let mut active_agents = 0;
 
     for agent in ctx.agents {
@@ -183,7 +182,6 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         if is_inst {
             active_agents += 1;
             total_requests += agent.quota_used;
-            total_remaining += agent.quota_remaining;
         }
 
         summary_rows.push(Row::new(vec![
@@ -326,11 +324,32 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ])
         .split(right_chunks[0]);
 
+    let mut total_tokens = 0u64;
+    let mut total_cost = 0.0f64;
+    for agent in ctx.agents {
+        if agent.executable_path.is_some() {
+            if let Some(t) = agent.tokens_used {
+                total_tokens += t;
+            }
+            if let Some(c) = agent.cost_usd {
+                total_cost += c;
+            }
+        }
+    }
+
+    let total_tokens_str = if total_tokens >= 1_000_000 {
+        format!("{:.2}M", total_tokens as f64 / 1_000_000.0)
+    } else if total_tokens >= 1_000 {
+        format!("{:.1}K", total_tokens as f64 / 1_000.0)
+    } else {
+        total_tokens.to_string()
+    };
+
     let stat_boxes = [
         ("Active Assistants", format!("{}/{}", active_agents, ctx.agents.len()), color_primary),
         ("Total Requests", total_requests.to_string(), COLOR_SUCCESS),
-        ("Remaining Quota", total_remaining.to_string(), COLOR_WARN),
-        ("TUI Sync Status", "Asynchronous".to_string(), COLOR_DANGER),
+        ("Total Tokens Used", total_tokens_str, COLOR_WARN),
+        ("Estimated Spend", format!("${:.2}", total_cost), COLOR_DANGER),
     ];
 
     for (i, &(title, ref val, color)) in stat_boxes.iter().enumerate() {
@@ -644,7 +663,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .constraints([
             Constraint::Length(2), // Quota Used
             Constraint::Length(2), // Quota Remaining
-            Constraint::Length(2), // Additional Info
+            Constraint::Min(2),    // Additional Info
         ])
         .split(stats_inner);
 
@@ -698,7 +717,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         }
     };
 
-    let info_text = vec![
+    let mut info_text = vec![
         Line::from(vec![
             Span::styled("User Account Tier: ", Style::default().fg(COLOR_MUTED)),
             Span::styled(selected_agent.user_tier.display_name(), Style::default().fg(color_primary).bold()),
@@ -706,12 +725,37 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Span::styled(match selected_agent.quota_type {
                 crate::agent::QuotaType::Daily => "Daily",
                 crate::agent::QuotaType::Weekly => "Weekly",
+                crate::agent::QuotaType::Monthly => "Monthly",
                 crate::agent::QuotaType::Unlimited => "Unlimited",
             }, Style::default().fg(COLOR_WARN).bold()),
             Span::styled("   |   Will Renew: ", Style::default().fg(COLOR_MUTED)),
             Span::styled(reset_str, Style::default().fg(COLOR_SUCCESS).bold()),
         ]),
     ];
+
+    if selected_agent.tokens_used.is_some() || selected_agent.cost_usd.is_some() {
+        let mut extra_spans = Vec::new();
+        if let Some(tokens) = selected_agent.tokens_used {
+            extra_spans.push(Span::styled("Tokens Consumed: ", Style::default().fg(COLOR_MUTED)));
+            let tok_str = if tokens >= 1_000_000 {
+                format!("{:.2}M", tokens as f64 / 1_000_000.0)
+            } else if tokens >= 1_000 {
+                format!("{:.1}K", tokens as f64 / 1_000.0)
+            } else {
+                tokens.to_string()
+            };
+            extra_spans.push(Span::styled(tok_str, Style::default().fg(COLOR_TEXT).bold()));
+        }
+        if let Some(cost) = selected_agent.cost_usd {
+            if !extra_spans.is_empty() {
+                extra_spans.push(Span::styled("   |   ", Style::default().fg(COLOR_MUTED)));
+            }
+            extra_spans.push(Span::styled("Estimated Cost: ", Style::default().fg(COLOR_MUTED)));
+            extra_spans.push(Span::styled(format!("${:.4}", cost), Style::default().fg(COLOR_SUCCESS).bold()));
+        }
+        info_text.push(Line::from(extra_spans));
+    }
+
     f.render_widget(Paragraph::new(info_text), gauge_chunks[2]);
 
     // Model Breakdown Card
@@ -915,6 +959,7 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Cell::new(match agent.quota_type {
                 crate::agent::QuotaType::Daily => "Daily",
                 crate::agent::QuotaType::Weekly => "Weekly",
+                crate::agent::QuotaType::Monthly => "Monthly",
                 crate::agent::QuotaType::Unlimited => "Unlimited",
             }.to_string()).style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
             Cell::new(if is_inst {

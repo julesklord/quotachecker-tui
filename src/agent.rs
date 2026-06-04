@@ -21,6 +21,7 @@ pub enum AgentId {
 pub enum QuotaType {
     Daily,
     Weekly,
+    Monthly,
     Unlimited,
 }
 
@@ -81,6 +82,8 @@ pub struct AgentState {
     // Usage stats
     pub sessions_count: u32,
     pub requests_count: u32,
+    pub tokens_used: Option<u64>,
+    pub cost_usd: Option<f64>,
     
     // Model breakdown
     pub model_usages: Vec<ModelUsage>,
@@ -153,6 +156,26 @@ fn seconds_until_daily_reset() -> i64 {
         tomorrow.signed_duration_since(now).num_seconds()
     } else {
         24 * 3600
+    }
+}
+
+fn seconds_until_monthly_reset() -> i64 {
+    use chrono::{Local, Datelike, TimeZone};
+    let now = Local::now();
+    let year = now.year();
+    let month = now.month();
+    
+    // Find first day of next month
+    let (next_month, next_year) = if month == 12 {
+        (1, year + 1)
+    } else {
+        (month + 1, year)
+    };
+    
+    if let Some(next_month_dt) = Local.from_local_datetime(&chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap().and_hms_opt(0, 0, 0).unwrap()).single() {
+        next_month_dt.signed_duration_since(now).num_seconds()
+    } else {
+        30 * 24 * 3600 // fallback 30 days
     }
 }
 
@@ -359,6 +382,7 @@ impl AgentScanner {
         let mut gpt5_count = 0;
         let mut gpt41_count = 0;
         let mut claude4_count = 0;
+        let mut codex_tokens = 0u64;
         
         if codex_installed {
             let codex_db_path = home_path.join(".codex/state_5.sqlite");
@@ -370,6 +394,10 @@ impl AgentScanner {
                     if let Ok(count) = conn.query_row("SELECT count(*) FROM threads", [], |r| r.get::<_, u32>(0)) {
                         codex_sessions = count;
                         codex_requests = count * 10;
+                    }
+                    
+                    if let Ok(tokens) = conn.query_row("SELECT SUM(tokens_used) FROM threads", [], |r| r.get::<_, Option<f64>>(0)) {
+                        codex_tokens = tokens.unwrap_or(0.0) as u64;
                     }
                     
                     if let Ok(mut stmt) = conn.prepare("SELECT model, count(*) FROM threads WHERE model IS NOT NULL AND model != '' GROUP BY model") {
@@ -437,6 +465,8 @@ impl AgentScanner {
             seconds_until_reset: if codex_auth { seconds_until_daily_reset() } else { 0 },
             sessions_count: codex_sessions,
             requests_count: codex_requests,
+            tokens_used: Some(codex_tokens),
+            cost_usd: Some(0.0),
             model_usages: codex_model_usages,
         });
 
@@ -459,6 +489,8 @@ impl AgentScanner {
         let mut opencode_tier = if opencode_exe.is_some() { UserTier::Guest } else { UserTier::NotInstalled };
         let mut ds_coder_count = 0;
         let mut ds_reasoner_count = 0;
+        let mut opencode_tokens = 0u64;
+        let mut opencode_cost = 0.0f64;
         
         let mut opencode_provider = "DeepSeek".to_string(); // default if unknown/disconnected
         
@@ -611,6 +643,17 @@ impl AgentScanner {
                     opencode_requests = count;
                 }
                 
+                if let Ok(mut stmt) = conn.prepare("SELECT SUM(tokens_input + tokens_output), SUM(cost) FROM session") {
+                    if let Ok(mut rows) = stmt.query([]) {
+                        if let Ok(Some(row)) = rows.next() {
+                            let t: Option<f64> = row.get(0).ok();
+                            let c: Option<f64> = row.get(1).ok();
+                            opencode_tokens = t.unwrap_or(0.0) as u64;
+                            opencode_cost = c.unwrap_or(0.0);
+                        }
+                    }
+                }
+                
                 let mut ds_coder_db = 0;
                 let mut ds_reasoner_db = 0;
                 if let Ok(mut stmt) = conn.prepare("SELECT model, count(*) FROM session WHERE model IS NOT NULL AND model != '' GROUP BY model") {
@@ -660,6 +703,7 @@ impl AgentScanner {
                 requests_used: opencode_requests - ((ds_reasoner_count * 6) / 10 + (ds_coder_count * 6) / 10),
                 limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
             });
+            opencode_cost = 0.0; // Override to free for Copilot subscription
         } else if opencode_provider == "OpenAI" {
             opencode_model_usages.push(ModelUsage {
                 name: "gpt-4o".to_string(),
@@ -699,6 +743,12 @@ impl AgentScanner {
         let opencode_used = opencode_requests;
         let opencode_rem = if opencode_limit > opencode_used { opencode_limit - opencode_used } else { 0 };
         
+        let (opencode_qtype, opencode_reset) = if opencode_provider == "GitHub Copilot" {
+            (QuotaType::Unlimited, 0i64)
+        } else {
+            (QuotaType::Monthly, seconds_until_monthly_reset())
+        };
+        
         agents.push(AgentState {
             id: AgentId::OpenCode,
             name: "OpenCode".to_string(),
@@ -707,14 +757,16 @@ impl AgentScanner {
             config_path: opencode_config_str,
             is_authenticated: opencode_auth,
             auth_info: opencode_auth_info,
-            quota_type: QuotaType::Weekly,
+            quota_type: opencode_qtype,
             user_tier: opencode_tier,
             quota_used: opencode_used,
             quota_limit: opencode_limit,
             quota_remaining: opencode_rem,
-            seconds_until_reset: if opencode_tier != UserTier::NotInstalled { seconds_until_weekly_reset() } else { 0 },
+            seconds_until_reset: if opencode_tier != UserTier::NotInstalled { opencode_reset } else { 0 },
             sessions_count: opencode_sessions,
             requests_count: opencode_requests,
+            tokens_used: Some(opencode_tokens),
+            cost_usd: Some(opencode_cost),
             model_usages: opencode_model_usages,
         });
 
@@ -818,7 +870,7 @@ impl AgentScanner {
         gemini_model_usages.push(ModelUsage {
             name: "gemini-3.1-pro".to_string(),
             requests_used: gemini_pro_count,
-            limit: *config.model_limits.get("gemini-3.1-pro").unwrap_or(&150),
+            limit: *config.model_limits.get("gemini-3.1-pro").unwrap_or(&50),
         });
         
         let gemini_limit = config.gemini_quota.limit;
@@ -841,6 +893,8 @@ impl AgentScanner {
             seconds_until_reset: if gemini_tier != UserTier::NotInstalled { seconds_until_daily_reset() } else { 0 },
             sessions_count: gemini_sessions,
             requests_count: gemini_requests,
+            tokens_used: None,
+            cost_usd: Some(0.0),
             model_usages: gemini_model_usages,
         });
 
@@ -911,7 +965,7 @@ impl AgentScanner {
         agy_model_usages.push(ModelUsage {
             name: "Gemini 3.1 Pro".to_string(),
             requests_used: agy_pro_count,
-            limit: *config.model_limits.get("Gemini 3.1 Pro").unwrap_or(&150),
+            limit: *config.model_limits.get("Gemini 3.1 Pro").unwrap_or(&50),
         });
         
         let agy_limit = config.agy_quota.limit;
@@ -934,6 +988,8 @@ impl AgentScanner {
             seconds_until_reset: if agy_tier != UserTier::NotInstalled { seconds_until_weekly_reset() } else { 0 },
             sessions_count: agy_sessions / 2,
             requests_count: agy_requests,
+            tokens_used: None,
+            cost_usd: Some(0.0),
             model_usages: agy_model_usages,
         });
 
@@ -1007,6 +1063,8 @@ impl AgentScanner {
             seconds_until_reset: if zed_installed { seconds_until_daily_reset() } else { 0 },
             sessions_count: zed_sessions,
             requests_count: zed_requests,
+            tokens_used: None,
+            cost_usd: Some(0.0),
             model_usages: zed_model_usages,
         });
 
