@@ -10,8 +10,8 @@ use crate::agent::{AgentId, AgentState};
 use crate::config::{AppConfig, TuiTheme};
 
 // Define Harmonious Colors
-const COLOR_BG: Color = Color::Rgb(10, 10, 12);
-const COLOR_CARD: Color = Color::Rgb(20, 20, 25);
+const COLOR_BG: Color = Color::Reset;
+const COLOR_CARD: Color = Color::Reset;
 const COLOR_TEXT: Color = Color::Rgb(220, 220, 225);
 const COLOR_MUTED: Color = Color::Rgb(120, 120, 130);
 const COLOR_SUCCESS: Color = Color::Rgb(46, 204, 113); // Emerald Green

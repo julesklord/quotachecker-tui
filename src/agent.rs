@@ -629,6 +629,25 @@ impl AgentScanner {
                         }
                     }
                 }
+                if let Ok(model_json) = conn.query_row(
+                    "SELECT model FROM session WHERE model IS NOT NULL AND model != '' ORDER BY time_updated DESC LIMIT 1",
+                    [],
+                    |r| r.get::<_, String>(0)
+                ) {
+                    if let Ok(val) = serde_json::from_str::<serde_json::Value>(&model_json) {
+                        if let Some(provider_id) = val.get("providerID").and_then(|v| v.as_str()) {
+                            opencode_provider = match provider_id {
+                                "github-copilot" => "GitHub Copilot".to_string(),
+                                "opencode" => "OpenCode Zen".to_string(),
+                                "openai" => "OpenAI".to_string(),
+                                "anthropic" => "Anthropic Claude".to_string(),
+                                "google" => "Google Gemini".to_string(),
+                                "deepseek" => "DeepSeek".to_string(),
+                                other => other.to_string(),
+                            };
+                        }
+                    }
+                }
                 
                 if !detected_email.is_empty() {
                     opencode_auth = true;
@@ -743,11 +762,8 @@ impl AgentScanner {
         let opencode_used = opencode_requests;
         let opencode_rem = if opencode_limit > opencode_used { opencode_limit - opencode_used } else { 0 };
         
-        let (opencode_qtype, opencode_reset) = if opencode_provider == "GitHub Copilot" {
-            (QuotaType::Unlimited, 0i64)
-        } else {
-            (QuotaType::Monthly, seconds_until_monthly_reset())
-        };
+        let opencode_qtype = QuotaType::Monthly;
+        let opencode_reset = seconds_until_monthly_reset();
         
         agents.push(AgentState {
             id: AgentId::OpenCode,
