@@ -2,18 +2,28 @@
 
 ## Prerequisites
 
-- [Tool 1] (vX.Y.Z)
-- [Tool 2]
-- A functioning brain (v1.0.0 or higher)
+- **Rust:** Latest stable (v1.75+ recommended for `is_multiple_of` and other recent features).
+- **Cargo:** Dependency manager and build tool.
+- **SQLite:** Required for scanning agent databases (bundled via `rusqlite`).
 
 ## Local Setup
 
-1. Clone the repository.
-2. [Installation step]
-3. [Environment configuration step]
+1. Clone the repository: `git clone <repo-url>`
+2. Install dependencies and build: `cargo build`
+3. Running the dashboard: `cargo run`
 
-## Useful Commands
+## Quality Control & Verification
 
-- `npm start` / `cargo run`: Start in development.
-- `npm test` / `cargo test`: Run the test suite. (Do it.)
-- `npm run build` / `cargo build`: Compile for production.
+We maintain high code quality standards. Every contribution must pass:
+
+- **Linting:** `cargo clippy -- -D warnings` (Zero warnings allowed).
+- **Formatting:** `cargo fmt --all -- --check` (Adhere to standard Rust style).
+- **Testing:** `cargo test` (Validate logic and regressions).
+
+## Project Structure
+
+- `src/main.rs`: Application entry point and event loop.
+- `src/agent.rs`: Scanners and telemetry logic.
+- `src/ui.rs`: UI rendering and component definitions.
+- `src/config.rs`: Configuration management.
+- `src/tests.rs`: Unit testing module.

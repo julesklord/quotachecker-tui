@@ -1,25 +1,29 @@
 # Hygiene and Git Workflow
 
-This project strictly follows the **[Your Organization] Development Bible**. Deviations will be met with silent judgment.
+This project follows strict clean-code principles and atomic commit history.
 
 ## Atomic Commits
 
-The use of **Conventional Commits** is mandatory:
-`<type>(<scope>): <subject>`
+Use **Conventional Commits**: `<type>(<scope>): <subject>`
 
 ### Allowed Types
 
 - `feat`: New functionality.
 - `fix`: Bug correction.
-- `docs`: Documentation changes.
-- `style`: Visual changes (no logic).
-- `refactor`: Code change that neither adds nor fixes anything. (Cleaning up your mess.)
-- `chore`: Maintenance tasks, dependencies.
+- `docs`: Documentation changes in `docs/` or `README.md`.
+- `style`: UI/UX changes (no logic).
+- `refactor`: Code cleanup or improvements (e.g., Clippy fixes).
+- `test`: Adding or updating tests.
+- `chore`: Maintenance, dependencies, version bumps.
 
 ## Branch Workflow
 
-- `main`: Production branch (linear history only).
-- `feat/*`: Branches for new functionalities.
-- `fix/*`: Branches for corrections.
+- `main`: Protected. Only clean, tested code.
+- `feat/*`: Feature development.
+- `fix/*`: Bug fixes.
 
-**Banned:** `git push --force` to `main`. Don't even think about it.
+## Maintenance Rules
+
+- **CHANGELOG.md**: Must be updated with every `feat` or `fix`.
+- **VERSION**: Ensure the `VERSION` file matches `Cargo.toml`.
+- **No Force Push**: Never force-push to `main`.

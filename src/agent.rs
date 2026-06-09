@@ -179,7 +179,7 @@ fn seconds_until_monthly_reset() -> i64 {
     }
 }
 
-fn base64_decode(input: &str) -> Option<Vec<u8>> {
+pub(crate) fn base64_decode(input: &str) -> Option<Vec<u8>> {
     const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut map = [255u8; 256];
     for (i, &c) in ALPHABET.iter().enumerate() {
@@ -209,7 +209,7 @@ fn base64_decode(input: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-fn decode_jwt_payload(jwt: &str) -> Option<serde_json::Value> {
+pub(crate) fn decode_jwt_payload(jwt: &str) -> Option<serde_json::Value> {
     let parts: Vec<&str> = jwt.split('.').collect();
     if parts.len() < 2 {
         return None;
@@ -220,7 +220,7 @@ fn decode_jwt_payload(jwt: &str) -> Option<serde_json::Value> {
         .replace('-', "+")
         .replace('_', "/");
         
-    while b64.len() % 4 != 0 {
+    while !b64.len().is_multiple_of(4) {
         b64.push('=');
     }
     
@@ -422,31 +422,32 @@ impl AgentScanner {
         }
         
         if gpt5_count == 0 && gpt41_count == 0 && claude4_count == 0 && codex_requests > 0 {
-            gpt5_count = (codex_requests * 1) / 10;
+            gpt5_count = codex_requests / 10;
             gpt41_count = (codex_requests * 5) / 10;
             claude4_count = codex_requests - gpt5_count - gpt41_count;
         }
         
-        let mut codex_model_usages = Vec::new();
-        codex_model_usages.push(ModelUsage {
-            name: "gpt-5".to_string(),
-            requests_used: gpt5_count,
-            limit: *config.model_limits.get("gpt-5").unwrap_or(&50),
-        });
-        codex_model_usages.push(ModelUsage {
-            name: "gpt-4.1".to_string(),
-            requests_used: gpt41_count,
-            limit: *config.model_limits.get("gpt-4.1").unwrap_or(&100),
-        });
-        codex_model_usages.push(ModelUsage {
-            name: "claude-4.7".to_string(),
-            requests_used: claude4_count,
-            limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
-        });
+        let codex_model_usages = vec![
+            ModelUsage {
+                name: "gpt-5".to_string(),
+                requests_used: gpt5_count,
+                limit: *config.model_limits.get("gpt-5").unwrap_or(&50),
+            },
+            ModelUsage {
+                name: "gpt-4.1".to_string(),
+                requests_used: gpt41_count,
+                limit: *config.model_limits.get("gpt-4.1").unwrap_or(&100),
+            },
+            ModelUsage {
+                name: "claude-4.7".to_string(),
+                requests_used: claude4_count,
+                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+            },
+        ];
         
         let codex_limit = config.codex_quota.limit;
         let codex_used = codex_requests;
-        let codex_rem = if codex_limit > codex_used { codex_limit - codex_used } else { 0 };
+        let codex_rem = codex_limit.saturating_sub(codex_used);
         let codex_qtype = if codex_auth { QuotaType::Daily } else { QuotaType::Unlimited };
         
         agents.push(AgentState {
@@ -709,7 +710,7 @@ impl AgentScanner {
         if opencode_provider == "GitHub Copilot" {
             opencode_model_usages.push(ModelUsage {
                 name: "gpt-5".to_string(),
-                requests_used: (ds_reasoner_count * 1) / 10 + (ds_coder_count * 1) / 10,
+                requests_used: ds_reasoner_count / 10 + ds_coder_count / 10,
                 limit: *config.model_limits.get("gpt-5").unwrap_or(&50),
             });
             opencode_model_usages.push(ModelUsage {
@@ -760,7 +761,7 @@ impl AgentScanner {
         
         let opencode_limit = config.opencode_quota.limit;
         let opencode_used = opencode_requests;
-        let opencode_rem = if opencode_limit > opencode_used { opencode_limit - opencode_used } else { 0 };
+        let opencode_rem = opencode_limit.saturating_sub(opencode_used);
         
         let opencode_qtype = QuotaType::Monthly;
         let opencode_reset = seconds_until_monthly_reset();
@@ -877,21 +878,22 @@ impl AgentScanner {
             gemini_pro_count = gemini_requests - gemini_flash_count;
         }
         
-        let mut gemini_model_usages = Vec::new();
-        gemini_model_usages.push(ModelUsage {
-            name: "gemini-3.5-flash".to_string(),
-            requests_used: gemini_flash_count,
-            limit: *config.model_limits.get("gemini-3.5-flash").unwrap_or(&1500),
-        });
-        gemini_model_usages.push(ModelUsage {
-            name: "gemini-3.1-pro".to_string(),
-            requests_used: gemini_pro_count,
-            limit: *config.model_limits.get("gemini-3.1-pro").unwrap_or(&50),
-        });
+        let gemini_model_usages = vec![
+            ModelUsage {
+                name: "gemini-3.5-flash".to_string(),
+                requests_used: gemini_flash_count,
+                limit: *config.model_limits.get("gemini-3.5-flash").unwrap_or(&1500),
+            },
+            ModelUsage {
+                name: "gemini-3.1-pro".to_string(),
+                requests_used: gemini_pro_count,
+                limit: *config.model_limits.get("gemini-3.1-pro").unwrap_or(&50),
+            },
+        ];
         
         let gemini_limit = config.gemini_quota.limit;
         let gemini_used = gemini_requests;
-        let gemini_rem = if gemini_limit > gemini_used { gemini_limit - gemini_used } else { 0 };
+        let gemini_rem = gemini_limit.saturating_sub(gemini_used);
         
         agents.push(AgentState {
             id: AgentId::GeminiCli,
@@ -972,21 +974,22 @@ impl AgentScanner {
             agy_flash_count = (agy_requests * 7) / 10;
             agy_pro_count = agy_requests - agy_flash_count;
         }
-        let mut agy_model_usages = Vec::new();
-        agy_model_usages.push(ModelUsage {
-            name: "Gemini 3.5 Flash".to_string(),
-            requests_used: agy_flash_count,
-            limit: *config.model_limits.get("Gemini 3.5 Flash").unwrap_or(&1500),
-        });
-        agy_model_usages.push(ModelUsage {
-            name: "Gemini 3.1 Pro".to_string(),
-            requests_used: agy_pro_count,
-            limit: *config.model_limits.get("Gemini 3.1 Pro").unwrap_or(&50),
-        });
+        let agy_model_usages = vec![
+            ModelUsage {
+                name: "Gemini 3.5 Flash".to_string(),
+                requests_used: agy_flash_count,
+                limit: *config.model_limits.get("Gemini 3.5 Flash").unwrap_or(&1500),
+            },
+            ModelUsage {
+                name: "Gemini 3.1 Pro".to_string(),
+                requests_used: agy_pro_count,
+                limit: *config.model_limits.get("Gemini 3.1 Pro").unwrap_or(&50),
+            },
+        ];
         
         let agy_limit = config.agy_quota.limit;
         let agy_used = agy_requests;
-        let agy_rem = if agy_limit > agy_used { agy_limit - agy_used } else { 0 };
+        let agy_rem = agy_limit.saturating_sub(agy_used);
         
         agents.push(AgentState {
             id: AgentId::Agy,
@@ -1047,21 +1050,22 @@ impl AgentScanner {
             zed_sonnet_count = (zed_requests * 8) / 10;
             zed_haiku_count = zed_requests - zed_sonnet_count;
         }
-        let mut zed_model_usages = Vec::new();
-        zed_model_usages.push(ModelUsage {
-            name: "claude-4.7".to_string(),
-            requests_used: zed_sonnet_count,
-            limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
-        });
-        zed_model_usages.push(ModelUsage {
-            name: "claude-4.7".to_string(),
-            requests_used: zed_haiku_count,
-            limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
-        });
+        let zed_model_usages = vec![
+            ModelUsage {
+                name: "claude-4.7".to_string(),
+                requests_used: zed_sonnet_count,
+                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+            },
+            ModelUsage {
+                name: "claude-4.7".to_string(),
+                requests_used: zed_haiku_count,
+                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+            },
+        ];
         
         let zed_limit = config.zed_quota.limit;
         let zed_used = zed_requests;
-        let zed_rem = if zed_limit > zed_used { zed_limit - zed_used } else { 0 };
+        let zed_rem = zed_limit.saturating_sub(zed_used);
         
         agents.push(AgentState {
             id: AgentId::Zed,

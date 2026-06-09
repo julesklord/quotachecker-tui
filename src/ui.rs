@@ -131,7 +131,7 @@ fn draw_header(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     f.render_widget(tabs, chunks[1]);
 
     // 3. Quick Stats/Sync indicator
-    let pulse_char = if ctx.tick_count % 4 == 0 { "●" } else { "○" };
+    let pulse_char = if ctx.tick_count.is_multiple_of(4) { "●" } else { "○" };
     let sync_text = Line::from(vec![
         Span::styled(format!(" {} ", pulse_char), Style::default().fg(COLOR_SUCCESS)),
         Span::styled("ASYNC SYNC ", Style::default().fg(COLOR_TEXT).bold()),
@@ -487,7 +487,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             };
 
             let label = if quota_type == crate::agent::QuotaType::Unlimited {
-                format!("Unlimited Local Usage")
+                "Unlimited Local Usage".to_string()
             } else {
                 format!("{:.1}% ({}/{})", ratio * 100.0, quota_used, quota_limit)
             };
@@ -672,7 +672,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .gauge_style(Style::default().fg(color_primary).bg(Color::Rgb(40, 40, 45)))
         .ratio(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited { 1.0 } else { quota_ratio as f64 })
         .label(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
-            format!("Uso Local Ilimitado")
+            "Uso Local Ilimitado".to_string()
         } else {
             format!("{}/{} Requests Used ({:.1}%)", selected_agent.quota_used, selected_agent.quota_limit, quota_ratio * 100.0)
         });
@@ -689,7 +689,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .gauge_style(Style::default().fg(COLOR_SUCCESS).bg(Color::Rgb(40, 40, 45)))
         .ratio(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited { 1.0 } else { rem_ratio as f64 })
         .label(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
-            format!("Uso Local Ilimitado")
+            "Uso Local Ilimitado".to_string()
         } else {
             format!("{} Requests Remaining ({:.1}%)", selected_agent.quota_remaining, rem_ratio * 100.0)
         });
@@ -1204,7 +1204,7 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(border_color));
         
-    let cursor_suffix = if ctx.tick_count % 2 == 0 { "█" } else { "" };
+    let cursor_suffix = if ctx.tick_count.is_multiple_of(2) { "█" } else { "" };
     let display_val = ctx.editing_value.to_string();
     
     let row_chunks = Layout::default()

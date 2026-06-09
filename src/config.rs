@@ -4,19 +4,14 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use directories::ProjectDirs;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TuiTheme {
+    #[default]
     Cyan,
     Purple,
     Emerald,
     Amber,
     Monochrome,
-}
-
-impl Default for TuiTheme {
-    fn default() -> Self {
-        TuiTheme::Cyan
-    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

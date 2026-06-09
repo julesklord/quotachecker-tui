@@ -16,10 +16,13 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 mod agent;
 mod config;
 mod ui;
+mod tests;
 
 use agent::{AgentId, AgentScanner, AgentState};
 use config::AppConfig;
 use ui::RenderContext;
+
+type ScanResult = (Vec<AgentState>, Vec<String>);
 
 struct App {
     config: AppConfig,
@@ -138,7 +141,7 @@ impl App {
                 // Update UI state instantly
                 self.agents[self.selected_agent_idx].quota_limit = val;
                 let used = self.agents[self.selected_agent_idx].quota_used;
-                self.agents[self.selected_agent_idx].quota_remaining = if val > used { val - used } else { 0 };
+                self.agents[self.selected_agent_idx].quota_remaining = val.saturating_sub(used);
             } else {
                 self.add_log("Error saving configuration to disk.");
             }
@@ -226,7 +229,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut last_tick = Instant::now();
 
     // 3. Setup Async Background Scan Thread
-    let (tx, rx): (Sender<(Vec<AgentState>, Vec<String>)>, Receiver<(Vec<AgentState>, Vec<String>)>) = mpsc::channel();
+    let (tx, rx): (Sender<ScanResult>, Receiver<ScanResult>) = mpsc::channel();
     
     thread::spawn(move || {
         loop {
@@ -284,10 +287,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         KeyCode::Backspace => {
                             app.editing_value.pop();
                         }
-                        KeyCode::Char(c) => {
-                            if c.is_ascii_digit() {
-                                app.editing_value.push(c);
-                            }
+                        KeyCode::Char(c) if c.is_ascii_digit() => {
+                            app.editing_value.push(c);
                         }
                         _ => {}
                     }
@@ -383,30 +384,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
                         
-                        KeyCode::Enter => {
-                            if app.active_tab == 4 {
-                                if app.selected_setting_idx == 4 {
-                                    let _ = disable_raw_mode();
-                                    let mut stdout = io::stdout();
-                                    let _ = execute!(stdout, LeaveAlternateScreen);
+                        KeyCode::Enter if app.active_tab == 4 => {
+                            if app.selected_setting_idx == 4 {
+                                let _ = disable_raw_mode();
+                                let mut stdout = io::stdout();
+                                let _ = execute!(stdout, LeaveAlternateScreen);
+                                
+                                let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
+                                if let Some(path) = AppConfig::config_path() {
+                                    let _ = std::process::Command::new(editor)
+                                        .arg(&path)
+                                        .status();
                                     
-                                    let editor = std::env::var("EDITOR").unwrap_or_else(|_| "nano".to_string());
-                                    if let Some(path) = AppConfig::config_path() {
-                                        let _ = std::process::Command::new(editor)
-                                            .arg(&path)
-                                            .status();
-                                        
-                                        app.config = AppConfig::load();
-                                        app.add_log("Configuration reloaded from disk after manual edit.");
-                                    }
-                                    
-                                    let _ = enable_raw_mode();
-                                    let mut stdout = io::stdout();
-                                    let _ = execute!(stdout, EnterAlternateScreen);
-                                    let _ = terminal.clear();
-                                } else {
-                                    app.handle_setting_change(true);
+                                    app.config = AppConfig::load();
+                                    app.add_log("Configuration reloaded from disk after manual edit.");
                                 }
+                                
+                                let _ = enable_raw_mode();
+                                let mut stdout = io::stdout();
+                                let _ = execute!(stdout, EnterAlternateScreen);
+                                let _ = terminal.clear();
+                            } else {
+                                app.handle_setting_change(true);
                             }
                         }
                         _ => {}
