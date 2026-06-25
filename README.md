@@ -1,35 +1,108 @@
 # QuotaChecker-TUI
 
-> AI Agent Quota Monitoring TUI. Track your usage across multiple providers.
+> Terminal dashboard for tracking AI agent quota usage across multiple providers.
 
-![version](https://img.shields.io/badge/version-0.1.0-blue?style=plastic)  ![license](https://img.shields.io/badge/license-MIT-green?style=plastic)
+![version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)
+![rust](https://img.shields.io/badge/rust-1.85+-orange?style=flat-square)
+![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
-## What is it?
-**QuotaChecker-TUI** is a terminal-based dashboard designed to track request quotas and usage statistics for various AI agents (Codex, OpenCode, Gemini-CLI, Agy, Zed). It operates by performing background telemetry scans on local databases and log files, providing a unified view of your AI-assisted development costs and limits.
+## Overview
+
+QuotaChecker-TUI monitors request quotas and token usage for local AI coding agents by scanning their SQLite databases and log files in the background. Built with [Ratatui](https://ratatui.rs) + [Crossterm](https://github.com/crossterm-rs/crossterm).
+
+### Supported Agents
+
+| Agent | Data Source | Quota Types |
+|-------|-------------|-------------|
+| **Codex** | `~/.codex/sessions.db` | Requests, tokens, cost |
+| **OpenCode** | `~/.config/opencode/` | Monthly requests, cost, tokens |
+| **Gemini CLI** | `~/.gemini/` | Daily requests (Pro/Free tiers) |
+| **Zed** | `~/.config/zed/` | Session tokens |
+| **Agy** | `~/.config/agy/` | Token usage |
 
 ## Installation
 
+### Cargo (recommended)
+```bash
+cargo install --git https://github.com/julesklord/quotachecker-tui
+```
+
 ### From Source
-Requires Rust and Cargo.
 ```bash
 git clone https://github.com/julesklord/quotachecker-tui.git
 cd quotachecker-tui
 cargo build --release
+# Binary at target/release/quotachecker-tui
 ```
-The binary will be located at `target/release/quotachecker-tui`.
+
+Requires Rust 1.85+.
 
 ## Usage
-Simply run the executable:
+
 ```bash
-./target/release/quotachecker-tui
+quotachecker-tui
 ```
-Use `Tab` or `Arrows` to navigate between tabs (Overview, AI Agents, Sessions, Quotas, Settings). Press `s` in the Quotas tab to modify limits.
+
+### Keybindings
+
+| Key | Action |
+|-----|--------|
+| `Tab` / `←` `→` | Switch tabs |
+| `↑` `↓` | Navigate lists |
+| `s` | Edit quota limits (Quotas tab) |
+| `+` / `-` / `h` / `l` | Adjust values in Settings |
+| `Enter` | Confirm edit |
+| `Esc` | Cancel edit / Back |
+| `q` / `Ctrl+c` | Quit |
+
+### Tabs
+
+1. **Overview** — Aggregate tokens, cost, and request counts across all agents
+2. **AI Agents** — Per-agent details with token/cost breakdown
+3. **Sessions** — Individual session history per agent
+4. **Quotas** — Configure limits (daily/monthly requests, token caps, cost ceilings)
+5. **Settings** — App preferences, scan intervals, theme
+
+## Configuration
+
+Config stored at `~/.config/quotachecker/config.json` (XDG-compliant).
+
+```json
+{
+  "scan_interval_secs": 2,
+  "theme": "dark",
+  "agents": {
+    "codex": { "enabled": true, "quota": { "monthly_requests": 500 } },
+    "opencode": { "enabled": true, "quota": { "monthly_requests": 1000 } },
+    "gemini": { "enabled": true, "quota": { "daily_requests": 50 } }
+  }
+}
+```
+
+Edit via the **Settings** tab or modify the file directly.
 
 ## Architecture
-QuotaChecker-TUI is built with **Ratatui** and **Crossterm**. It uses a background thread to periodically scan local SQLite databases (from Codex, OpenCode, Gemini, etc.) and log files to extract usage data without blocking the UI thread.
 
-## Changelog
-See [CHANGELOG.md](./CHANGELOG.md)
+- **Background scanner** — Separate thread polls agent databases via `rusqlite` with `busy_timeout(500ms)`, sends updates via `mpsc` channel
+- **In-memory config** — `Arc<RwLock<AppConfig>>` eliminates disk I/O on every scan
+- **Cached exec lookups** — `OnceLock<Mutex<HashMap>>` for `which`/`--version` calls
+- **Panic-safe terminal** — Custom hook restores terminal state on crash
+
+## Development
+
+```bash
+cargo test        # Run unit tests
+cargo clippy      # Lint
+cargo fmt         # Format
+```
+
+## Documentation
+
+- [Architecture](docs/wiki/architecture.md) — Design decisions & ADRs
+- [Agent SOP](docs/wiki/agent-sop.md) — Adding new agent support
+- [Development](docs/wiki/development.md) — Contribution guidelines
+- [Hygiene](docs/wiki/hygiene.md) — Code quality standards
 
 ## License
-MIT License. See [LICENSE](./LICENSE) for details.
+
+MIT — see [LICENSE](LICENSE).

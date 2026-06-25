@@ -1,8 +1,8 @@
+use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use std::collections::HashMap;
-use directories::ProjectDirs;
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TuiTheme {
@@ -14,14 +14,19 @@ pub enum TuiTheme {
     Monochrome,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub struct AgentQuotaSettings {
     pub limit: u32,
+    #[serde(default)]
+    pub custom: bool,
 }
 
 impl Default for AgentQuotaSettings {
     fn default() -> Self {
-        Self { limit: 100 }
+        Self {
+            limit: 100,
+            custom: false,
+        }
     }
 }
 
@@ -33,7 +38,6 @@ pub struct AppConfig {
     pub theme: TuiTheme,
     pub codex_quota: AgentQuotaSettings,
     pub opencode_quota: AgentQuotaSettings,
-    pub gemini_quota: AgentQuotaSettings,
     pub agy_quota: AgentQuotaSettings,
     pub zed_quota: AgentQuotaSettings,
     pub model_limits: HashMap<String, u32>,
@@ -62,11 +66,22 @@ impl Default for AppConfig {
             soft_limit_percent: 80.0,
             hard_limit_percent: 100.0,
             theme: TuiTheme::Cyan,
-            codex_quota: AgentQuotaSettings { limit: 200 },
-            opencode_quota: AgentQuotaSettings { limit: 1000 },
-            gemini_quota: AgentQuotaSettings { limit: 2000 },
-            agy_quota: AgentQuotaSettings { limit: 500 },
-            zed_quota: AgentQuotaSettings { limit: 300 },
+            codex_quota: AgentQuotaSettings {
+                limit: 200,
+                custom: false,
+            },
+            opencode_quota: AgentQuotaSettings {
+                limit: 1000,
+                custom: false,
+            },
+            agy_quota: AgentQuotaSettings {
+                limit: 500,
+                custom: false,
+            },
+            zed_quota: AgentQuotaSettings {
+                limit: 300,
+                custom: false,
+            },
             model_limits,
         }
     }
@@ -93,7 +108,7 @@ impl AppConfig {
                 }
             }
         }
-        
+
         let default_config = Self::default();
         let _ = default_config.save();
         default_config

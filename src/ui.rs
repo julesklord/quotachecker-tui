@@ -2,7 +2,9 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Clear, Gauge, List, ListItem, Paragraph, Row, Table, Tabs},
+    widgets::{
+        Block, BorderType, Borders, Clear, Gauge, List, ListItem, Paragraph, Row, Table, Tabs,
+    },
     Frame,
 };
 
@@ -19,7 +21,7 @@ const COLOR_WARN: Color = Color::Rgb(241, 196, 15); // Sun Yellow
 const COLOR_DANGER: Color = Color::Rgb(231, 76, 60); // Alizarin Red
 
 // Agent Specific Highlight Colors
-const COLOR_GEMINI: Color = Color::Rgb(52, 152, 219); // Royal Blue
+
 const COLOR_AGY: Color = Color::Rgb(155, 89, 182); // Amethyst Purple
 const COLOR_OPENCODE: Color = Color::Rgb(26, 188, 156); // Turquoise
 const COLOR_CODEX: Color = Color::Rgb(230, 126, 34); // Pumpkin Orange
@@ -61,7 +63,7 @@ fn get_primary_color(theme: TuiTheme) -> Color {
 
 pub fn draw_ui(f: &mut Frame, ctx: &RenderContext) {
     let size = f.area();
-    
+
     // Clear whole screen with dark background
     let bg_block = Block::default().style(Style::default().bg(COLOR_BG));
     f.render_widget(bg_block, size);
@@ -77,13 +79,13 @@ pub fn draw_ui(f: &mut Frame, ctx: &RenderContext) {
         .split(size);
 
     draw_header(f, chunks[0], ctx);
-    
+
     match ctx.active_tab {
         0 => draw_overview_tab(f, chunks[1], ctx),
         1 => draw_agents_tab(f, chunks[1], ctx),
         2 => draw_sessions_tab(f, chunks[1], ctx),
-        3 => draw_settings_tab(f, chunks[1], ctx),
-        4 => draw_config_tab(f, chunks[1], ctx),
+        3 => draw_quotas_tab(f, chunks[1], ctx),
+        4 => draw_settings_tab(f, chunks[1], ctx),
         _ => {}
     }
 
@@ -97,7 +99,7 @@ pub fn draw_ui(f: &mut Frame, ctx: &RenderContext) {
 
 fn draw_header(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -113,15 +115,28 @@ fn draw_header(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         Span::styled("CHECKER-CLI", Style::default().fg(COLOR_TEXT).bold()),
         Span::styled(" TUI ", Style::default().fg(COLOR_MUTED).italic()),
     ]);
-    let title_widget = Paragraph::new(title_line)
-        .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(COLOR_MUTED)));
+    let title_widget = Paragraph::new(title_line).block(
+        Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(Style::default().fg(COLOR_MUTED)),
+    );
     f.render_widget(title_widget, chunks[0]);
 
     // 2. Navigation Tabs
-    let tab_titles = vec!["[1] Overview", "[2] AI Agents", "[3] Sessions", "[4] Quotas", "[5] Settings"];
+    let tab_titles = vec![
+        "[1] Overview",
+        "[2] AI Agents",
+        "[3] Sessions",
+        "[4] Quotas",
+        "[5] Settings",
+    ];
     let tabs = Tabs::new(tab_titles)
         .select(ctx.active_tab)
-        .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(COLOR_MUTED)))
+        .block(
+            Block::default()
+                .borders(Borders::BOTTOM)
+                .border_style(Style::default().fg(COLOR_MUTED)),
+        )
         .style(Style::default().fg(COLOR_MUTED))
         .highlight_style(
             Style::default()
@@ -131,20 +146,31 @@ fn draw_header(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     f.render_widget(tabs, chunks[1]);
 
     // 3. Quick Stats/Sync indicator
-    let pulse_char = if ctx.tick_count.is_multiple_of(4) { "●" } else { "○" };
+    let pulse_char = if ctx.tick_count.is_multiple_of(4) {
+        "●"
+    } else {
+        "○"
+    };
     let sync_text = Line::from(vec![
-        Span::styled(format!(" {} ", pulse_char), Style::default().fg(COLOR_SUCCESS)),
+        Span::styled(
+            format!(" {} ", pulse_char),
+            Style::default().fg(COLOR_SUCCESS),
+        ),
         Span::styled("ASYNC SYNC ", Style::default().fg(COLOR_TEXT).bold()),
     ]);
     let sync_widget = Paragraph::new(sync_text)
-        .block(Block::default().borders(Borders::BOTTOM).border_style(Style::default().fg(COLOR_MUTED)))
+        .block(
+            Block::default()
+                .borders(Borders::BOTTOM)
+                .border_style(Style::default().fg(COLOR_MUTED)),
+        )
         .alignment(ratatui::layout::Alignment::Right);
     f.render_widget(sync_widget, chunks[2]);
 }
 
 fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -174,7 +200,6 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let agent_color = match agent.id {
             AgentId::Codex => COLOR_CODEX,
             AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::GeminiCli => COLOR_GEMINI,
             AgentId::Agy => COLOR_AGY,
             AgentId::Zed => COLOR_ZED,
         };
@@ -187,7 +212,11 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         summary_rows.push(Row::new(vec![
             Cell::new(agent.name.clone()).style(Style::default().fg(agent_color).bold()),
             Cell::new(status_symbol).style(Style::default().fg(status_color).bold()),
-            Cell::new(agent.user_tier.display_name()).style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
+            Cell::new(agent.user_tier.display_name()).style(Style::default().fg(if is_inst {
+                COLOR_TEXT
+            } else {
+                COLOR_MUTED
+            })),
             Cell::new(if is_inst {
                 match agent.quota_type {
                     crate::agent::QuotaType::Unlimited => "Unlimited".to_string(),
@@ -195,7 +224,12 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
                 }
             } else {
                 "Omitted".to_string()
-            }).style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
+            })
+            .style(Style::default().fg(if is_inst {
+                COLOR_TEXT
+            } else {
+                COLOR_MUTED
+            })),
         ]));
     }
 
@@ -208,7 +242,10 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Constraint::Percentage(25),
         ],
     )
-    .header(Row::new(vec!["AI Agent", "Inst", "User Account Tier", "Quota Usage"]).style(Style::default().fg(color_primary).bold()))
+    .header(
+        Row::new(vec!["AI Agent", "Inst", "User Account Tier", "Quota Usage"])
+            .style(Style::default().fg(color_primary).bold()),
+    )
     .block(
         Block::default()
             .borders(Borders::ALL)
@@ -222,21 +259,26 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     // Comparative Agent Usage Chart Card
     let mut chart_lines = Vec::new();
     chart_lines.push(Line::from("")); // padding
-    
+
     for agent in ctx.agents {
         let is_inst = agent.executable_path.is_some();
         let agent_color = match agent.id {
             AgentId::Codex => COLOR_CODEX,
             AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::GeminiCli => COLOR_GEMINI,
             AgentId::Agy => COLOR_AGY,
             AgentId::Zed => COLOR_ZED,
         };
 
         if !is_inst {
             chart_lines.push(Line::from(vec![
-                Span::styled(format!("  {: <10} ", agent.name), Style::default().fg(COLOR_MUTED).bold()),
-                Span::styled("[ Telemetry Omitted - Not Installed ]", Style::default().fg(COLOR_MUTED).italic()),
+                Span::styled(
+                    format!("  {: <10} ", agent.name),
+                    Style::default().fg(COLOR_MUTED).bold(),
+                ),
+                Span::styled(
+                    "[ Telemetry Omitted - Not Installed ]",
+                    Style::default().fg(COLOR_MUTED).italic(),
+                ),
             ]));
         } else {
             let ratio = if agent.quota_limit > 0 {
@@ -247,10 +289,10 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
             let bar_width = 18;
             let bar_str = make_progress_bar(ratio, bar_width);
-            
+
             let soft_warn = ctx.config.soft_limit_percent / 100.0;
             let hard_warn = ctx.config.hard_limit_percent / 100.0;
-            
+
             let bar_color = if ratio >= hard_warn {
                 COLOR_DANGER
             } else if ratio >= soft_warn {
@@ -261,38 +303,60 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
             if agent.quota_type == crate::agent::QuotaType::Unlimited {
                 chart_lines.push(Line::from(vec![
-                    Span::styled(format!("  {: <10} ", agent.name), Style::default().fg(agent_color).bold()),
+                    Span::styled(
+                        format!("  {: <10} ", agent.name),
+                        Style::default().fg(agent_color).bold(),
+                    ),
                     Span::styled("█".repeat(bar_width), Style::default().fg(COLOR_SUCCESS)),
-                    Span::styled("  Local (Unlimited requests)", Style::default().fg(COLOR_TEXT)),
+                    Span::styled(
+                        "  Local (Unlimited requests)",
+                        Style::default().fg(COLOR_TEXT),
+                    ),
                 ]));
             } else {
                 chart_lines.push(Line::from(vec![
-                    Span::styled(format!("  {: <10} ", agent.name), Style::default().fg(agent_color).bold()),
+                    Span::styled(
+                        format!("  {: <10} ", agent.name),
+                        Style::default().fg(agent_color).bold(),
+                    ),
                     Span::styled(bar_str, Style::default().fg(bar_color)),
-                    Span::styled(format!("  {: >3}% ({}/{})", (ratio * 100.0) as u32, agent.quota_used, agent.quota_limit), Style::default().fg(COLOR_TEXT)),
+                    Span::styled(
+                        format!(
+                            "  {: >3}% ({}/{})",
+                            (ratio * 100.0) as u32,
+                            agent.quota_used,
+                            agent.quota_limit
+                        ),
+                        Style::default().fg(COLOR_TEXT),
+                    ),
                 ]));
             }
         }
     }
 
-    let chart_para = Paragraph::new(chart_lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(COLOR_MUTED))
-                .bg(COLOR_CARD)
-                .title(" COMPARATIVE ASSISTANT USAGE CHART "),
-        );
+    let chart_para = Paragraph::new(chart_lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED))
+            .bg(COLOR_CARD)
+            .title(" COMPARATIVE ASSISTANT USAGE CHART "),
+    );
     f.render_widget(chart_para, left_chunks[1]);
 
     // Live Logs preview card
-    let log_items: Vec<ListItem> = ctx.logs.iter().rev().take(15).map(|log| {
-        ListItem::new(Line::from(vec![
-            Span::styled("❯ ", Style::default().fg(color_primary)),
-            Span::styled(log, Style::default().fg(COLOR_TEXT)),
-        ]))
-    }).collect();
+    let log_items: Vec<ListItem> = ctx
+        .logs
+        .iter()
+        .rev()
+        .take(15)
+        .map(|log| {
+            ListItem::new(Line::from(vec![
+                Span::styled("❯ ", Style::default().fg(color_primary)),
+                Span::styled(log, Style::default().fg(COLOR_TEXT)),
+            ]))
+        })
+        .collect();
 
     let logs_list = List::new(log_items).block(
         Block::default()
@@ -309,7 +373,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(8), // Stats summary boxes
-            Constraint::Min(10),    // Progress Gauges
+            Constraint::Min(10),   // Progress Gauges
         ])
         .split(chunks[1]);
 
@@ -346,10 +410,18 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     };
 
     let stat_boxes = [
-        ("Active Assistants", format!("{}/{}", active_agents, ctx.agents.len()), color_primary),
+        (
+            "Active Assistants",
+            format!("{}/{}", active_agents, ctx.agents.len()),
+            color_primary,
+        ),
         ("Total Requests", total_requests.to_string(), COLOR_SUCCESS),
         ("Total Tokens Used", total_tokens_str, COLOR_WARN),
-        ("Estimated Spend", format!("${:.2}", total_cost), COLOR_DANGER),
+        (
+            "Estimated Spend",
+            format!("${:.2}", total_cost),
+            COLOR_DANGER,
+        ),
     ];
 
     for (i, &(title, ref val, color)) in stat_boxes.iter().enumerate() {
@@ -376,7 +448,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         if agent.executable_path.is_none() {
             continue; // Omit telemetry for uninstalled agents
         }
-        
+
         let ratio = if agent.quota_limit > 0 {
             (agent.quota_used as f64 / agent.quota_limit as f64).min(1.0)
         } else {
@@ -404,7 +476,6 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let agent_color = match agent.id {
             AgentId::Codex => COLOR_CODEX,
             AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::GeminiCli => COLOR_GEMINI,
             AgentId::Agy => COLOR_AGY,
             AgentId::Zed => COLOR_ZED,
         };
@@ -430,10 +501,11 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             .title(" ACTIVE QUOTAS (RATE LIMITS) ");
         let inner = no_agent_card.inner(right_chunks[1]);
         f.render_widget(no_agent_card, right_chunks[1]);
-        
-        let no_agent_p = Paragraph::new("\n\n No active AI agents are installed on the local system.")
-            .alignment(ratatui::layout::Alignment::Center)
-            .style(Style::default().fg(COLOR_MUTED));
+
+        let no_agent_p =
+            Paragraph::new("\n\n No active AI agents are installed on the local system.")
+                .alignment(ratatui::layout::Alignment::Center)
+                .style(Style::default().fg(COLOR_MUTED));
         f.render_widget(no_agent_p, inner);
     } else {
         // Divide bottom area into individual separated sections!
@@ -443,7 +515,11 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             .constraints(constraints)
             .split(right_chunks[1]);
 
-        for (i, (name, tier_name, name_color, ratio, quota_used, quota_limit, reset_str, quota_type)) in gauge_rows.into_iter().enumerate() {
+        for (
+            i,
+            (name, tier_name, name_color, ratio, quota_used, quota_limit, reset_str, quota_type),
+        ) in gauge_rows.into_iter().enumerate()
+        {
             // Separated Card Section for this assistant
             let agent_card = Block::default()
                 .borders(Borders::ALL)
@@ -494,7 +570,11 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
             let gauge = Gauge::default()
                 .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(40, 40, 45)))
-                .ratio(if quota_type == crate::agent::QuotaType::Unlimited { 1.0 } else { ratio })
+                .ratio(if quota_type == crate::agent::QuotaType::Unlimited {
+                    1.0
+                } else {
+                    ratio
+                })
                 .label(label);
 
             f.render_widget(gauge, card_layout[1]);
@@ -504,7 +584,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
 fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -518,15 +598,14 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     for (i, agent) in ctx.agents.iter().enumerate() {
         let is_selected = i == ctx.selected_agent_idx;
         let is_inst = agent.executable_path.is_some();
-        
+
         let prefix = if is_selected { "❯ " } else { "  " };
         let status_dot = if is_inst { "● " } else { "○ " };
         let status_color = if is_inst { COLOR_SUCCESS } else { COLOR_MUTED };
-        
+
         let item_color = match agent.id {
             AgentId::Codex => COLOR_CODEX,
             AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::GeminiCli => COLOR_GEMINI,
             AgentId::Agy => COLOR_AGY,
             AgentId::Zed => COLOR_ZED,
         };
@@ -544,15 +623,14 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ])));
     }
 
-    let agents_list = List::new(list_items)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(COLOR_MUTED))
-                .bg(COLOR_CARD)
-                .title(" AVAILABLE ASSISTANTS "),
-        );
+    let agents_list = List::new(list_items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED))
+            .bg(COLOR_CARD)
+            .title(" AVAILABLE ASSISTANTS "),
+    );
     f.render_widget(agents_list, chunks[0]);
 
     // Selected Agent details on the Right
@@ -560,7 +638,6 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let agent_color = match selected_agent.id {
         AgentId::Codex => COLOR_CODEX,
         AgentId::OpenCode => COLOR_OPENCODE,
-        AgentId::GeminiCli => COLOR_GEMINI,
         AgentId::Agy => COLOR_AGY,
         AgentId::Zed => COLOR_ZED,
     };
@@ -573,7 +650,10 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             .border_type(BorderType::Double)
             .border_style(Style::default().fg(COLOR_DANGER))
             .bg(COLOR_CARD)
-            .title(format!(" {} - INACTIVE ", selected_agent.name.to_uppercase()));
+            .title(format!(
+                " {} - INACTIVE ",
+                selected_agent.name.to_uppercase()
+            ));
 
         let inner_rect = card_block.inner(chunks[1]);
         f.render_widget(card_block, chunks[1]);
@@ -607,20 +687,43 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let meta_rows = vec![
         Row::new(vec![
             Cell::new("Binary Path:"),
-            Cell::new(selected_agent.executable_path.clone().unwrap_or_default()).style(Style::default().fg(COLOR_TEXT)),
+            Cell::new(selected_agent.executable_path.clone().unwrap_or_default())
+                .style(Style::default().fg(COLOR_TEXT)),
         ]),
         Row::new(vec![
             Cell::new("Version Detected:"),
-            Cell::new(selected_agent.version.clone().unwrap_or_else(|| "N/A".to_string())),
+            Cell::new(
+                selected_agent
+                    .version
+                    .clone()
+                    .unwrap_or_else(|| "N/A".to_string()),
+            ),
         ]),
         Row::new(vec![
             Cell::new("Config Directory:"),
-            Cell::new(selected_agent.config_path.clone().unwrap_or_else(|| "None".to_string())),
+            Cell::new(
+                selected_agent
+                    .config_path
+                    .clone()
+                    .unwrap_or_else(|| "None".to_string()),
+            ),
         ]),
         Row::new(vec![
             Cell::new("Auth Status:"),
-            Cell::new(if selected_agent.is_authenticated { "✔ Connected" } else { "✘ Disconnected" })
-                .style(Style::default().fg(if selected_agent.is_authenticated { COLOR_SUCCESS } else { COLOR_WARN }).bold()),
+            Cell::new(if selected_agent.is_authenticated {
+                "✔ Connected"
+            } else {
+                "✘ Disconnected"
+            })
+            .style(
+                Style::default()
+                    .fg(if selected_agent.is_authenticated {
+                        COLOR_SUCCESS
+                    } else {
+                        COLOR_WARN
+                    })
+                    .bold(),
+            ),
         ]),
         Row::new(vec![
             Cell::new("Auth Identity / User:"),
@@ -628,17 +731,16 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ]),
     ];
 
-    let meta_table = Table::new(
-        meta_rows,
-        [Constraint::Length(22), Constraint::Min(20)],
-    )
-    .block(
+    let meta_table = Table::new(meta_rows, [Constraint::Length(22), Constraint::Min(20)]).block(
         Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(agent_color))
             .bg(COLOR_CARD)
-            .title(format!(" DETAILS & SETTINGS FOR {} ", selected_agent.name.to_uppercase())),
+            .title(format!(
+                " DETAILS & SETTINGS FOR {} ",
+                selected_agent.name.to_uppercase()
+            )),
     );
     f.render_widget(meta_table, detail_chunks[0]);
 
@@ -654,7 +756,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .border_style(Style::default().fg(COLOR_MUTED))
         .bg(COLOR_CARD)
         .title(" QUOTA & RATE LIMITS UTILIZATION ");
-    
+
     let stats_inner = stats_card.inner(detail_chunks[1]);
     f.render_widget(stats_card, detail_chunks[1]);
 
@@ -669,35 +771,74 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     // Gauge 1: Used
     let used_gauge = Gauge::default()
-        .gauge_style(Style::default().fg(color_primary).bg(Color::Rgb(40, 40, 45)))
-        .ratio(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited { 1.0 } else { quota_ratio as f64 })
-        .label(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
-            "Uso Local Ilimitado".to_string()
-        } else {
-            format!("{}/{} Requests Used ({:.1}%)", selected_agent.quota_used, selected_agent.quota_limit, quota_ratio * 100.0)
-        });
+        .gauge_style(
+            Style::default()
+                .fg(color_primary)
+                .bg(Color::Rgb(40, 40, 45)),
+        )
+        .ratio(
+            if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
+                1.0
+            } else {
+                quota_ratio as f64
+            },
+        )
+        .label(
+            if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
+                "Uso Local Ilimitado".to_string()
+            } else {
+                format!(
+                    "{}/{} Requests Used ({:.1}%)",
+                    selected_agent.quota_used,
+                    selected_agent.quota_limit,
+                    quota_ratio * 100.0
+                )
+            },
+        );
     let used_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(18), Constraint::Min(10)])
         .split(gauge_chunks[0]);
-    f.render_widget(Paragraph::new("Requests Used:").style(Style::default().bold()), used_layout[0]);
+    f.render_widget(
+        Paragraph::new("Requests Used:").style(Style::default().bold()),
+        used_layout[0],
+    );
     f.render_widget(used_gauge, used_layout[1]);
 
     // Gauge 2: Remaining
     let rem_ratio = 1.0 - quota_ratio;
     let rem_gauge = Gauge::default()
-        .gauge_style(Style::default().fg(COLOR_SUCCESS).bg(Color::Rgb(40, 40, 45)))
-        .ratio(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited { 1.0 } else { rem_ratio as f64 })
-        .label(if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
-            "Uso Local Ilimitado".to_string()
-        } else {
-            format!("{} Requests Remaining ({:.1}%)", selected_agent.quota_remaining, rem_ratio * 100.0)
-        });
+        .gauge_style(
+            Style::default()
+                .fg(COLOR_SUCCESS)
+                .bg(Color::Rgb(40, 40, 45)),
+        )
+        .ratio(
+            if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
+                1.0
+            } else {
+                rem_ratio as f64
+            },
+        )
+        .label(
+            if selected_agent.quota_type == crate::agent::QuotaType::Unlimited {
+                "Uso Local Ilimitado".to_string()
+            } else {
+                format!(
+                    "{} Requests Remaining ({:.1}%)",
+                    selected_agent.quota_remaining,
+                    rem_ratio * 100.0
+                )
+            },
+        );
     let rem_layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(18), Constraint::Min(10)])
         .split(gauge_chunks[1]);
-    f.render_widget(Paragraph::new("Quota Available:").style(Style::default().bold()), rem_layout[0]);
+    f.render_widget(
+        Paragraph::new("Quota Available:").style(Style::default().bold()),
+        rem_layout[0],
+    );
     f.render_widget(rem_gauge, rem_layout[1]);
 
     // Info 3: Renewal & Tier
@@ -717,26 +858,33 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         }
     };
 
-    let mut info_text = vec![
-        Line::from(vec![
-            Span::styled("User Account Tier: ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(selected_agent.user_tier.display_name(), Style::default().fg(color_primary).bold()),
-            Span::styled("   |   Frequency: ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(match selected_agent.quota_type {
+    let mut info_text = vec![Line::from(vec![
+        Span::styled("User Account Tier: ", Style::default().fg(COLOR_MUTED)),
+        Span::styled(
+            selected_agent.user_tier.display_name(),
+            Style::default().fg(color_primary).bold(),
+        ),
+        Span::styled("   |   Frequency: ", Style::default().fg(COLOR_MUTED)),
+        Span::styled(
+            match selected_agent.quota_type {
                 crate::agent::QuotaType::Daily => "Daily",
                 crate::agent::QuotaType::Weekly => "Weekly",
                 crate::agent::QuotaType::Monthly => "Monthly",
                 crate::agent::QuotaType::Unlimited => "Unlimited",
-            }, Style::default().fg(COLOR_WARN).bold()),
-            Span::styled("   |   Will Renew: ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(reset_str, Style::default().fg(COLOR_SUCCESS).bold()),
-        ]),
-    ];
+            },
+            Style::default().fg(COLOR_WARN).bold(),
+        ),
+        Span::styled("   |   Will Renew: ", Style::default().fg(COLOR_MUTED)),
+        Span::styled(reset_str, Style::default().fg(COLOR_SUCCESS).bold()),
+    ])];
 
     if selected_agent.tokens_used.is_some() || selected_agent.cost_usd.is_some() {
         let mut extra_spans = Vec::new();
         if let Some(tokens) = selected_agent.tokens_used {
-            extra_spans.push(Span::styled("Tokens Consumed: ", Style::default().fg(COLOR_MUTED)));
+            extra_spans.push(Span::styled(
+                "Tokens Consumed: ",
+                Style::default().fg(COLOR_MUTED),
+            ));
             let tok_str = if tokens >= 1_000_000 {
                 format!("{:.2}M", tokens as f64 / 1_000_000.0)
             } else if tokens >= 1_000 {
@@ -744,14 +892,23 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             } else {
                 tokens.to_string()
             };
-            extra_spans.push(Span::styled(tok_str, Style::default().fg(COLOR_TEXT).bold()));
+            extra_spans.push(Span::styled(
+                tok_str,
+                Style::default().fg(COLOR_TEXT).bold(),
+            ));
         }
         if let Some(cost) = selected_agent.cost_usd {
             if !extra_spans.is_empty() {
                 extra_spans.push(Span::styled("   |   ", Style::default().fg(COLOR_MUTED)));
             }
-            extra_spans.push(Span::styled("Estimated Cost: ", Style::default().fg(COLOR_MUTED)));
-            extra_spans.push(Span::styled(format!("${:.4}", cost), Style::default().fg(COLOR_SUCCESS).bold()));
+            extra_spans.push(Span::styled(
+                "Estimated Cost: ",
+                Style::default().fg(COLOR_MUTED),
+            ));
+            extra_spans.push(Span::styled(
+                format!("${:.4}", cost),
+                Style::default().fg(COLOR_SUCCESS).bold(),
+            ));
         }
         info_text.push(Line::from(extra_spans));
     }
@@ -766,13 +923,13 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         } else {
             0.0
         };
-        
+
         let bar_width = 24;
         let bar_str = make_progress_bar(ratio, bar_width);
-        
+
         let soft_warn = ctx.config.soft_limit_percent / 100.0;
         let hard_warn = ctx.config.hard_limit_percent / 100.0;
-        
+
         let color_status = if ratio >= hard_warn {
             COLOR_DANGER
         } else if ratio >= soft_warn {
@@ -780,10 +937,11 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         } else {
             COLOR_SUCCESS
         };
-        
+
         model_rows.push(Row::new(vec![
             Cell::new(format!("  {}", model.name)).style(Style::default().fg(agent_color).bold()),
-            Cell::new(format!("{} / {} reqs", model.requests_used, model.limit)).style(Style::default().fg(COLOR_TEXT)),
+            Cell::new(format!("{} / {} reqs", model.requests_used, model.limit))
+                .style(Style::default().fg(COLOR_TEXT)),
             Cell::new(format!("{:.1}%", ratio * 100.0)).style(Style::default().fg(COLOR_TEXT)),
             Cell::new(bar_str).style(Style::default().fg(color_status)),
         ]));
@@ -799,8 +957,13 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ],
     )
     .header(
-        Row::new(vec!["  Model Name / Sub-Agent", "Usage / Configured Limit", "Usage %", "Active Progress Bar"])
-            .style(Style::default().fg(color_primary).bold()),
+        Row::new(vec![
+            "  Model Name / Sub-Agent",
+            "Usage / Configured Limit",
+            "Usage %",
+            "Active Progress Bar",
+        ])
+        .style(Style::default().fg(color_primary).bold()),
     )
     .block(
         Block::default()
@@ -817,9 +980,12 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         Span::styled("💡 Tip: ", Style::default().fg(color_primary).bold()),
         Span::styled("Press the ", Style::default().fg(COLOR_TEXT)),
         Span::styled("'s' ", Style::default().fg(COLOR_SUCCESS).bold()),
-        Span::styled("key to modify the request quota limit of this assistant on the fly.", Style::default().fg(COLOR_TEXT)),
+        Span::styled(
+            "key to modify the request quota limit of this assistant on the fly.",
+            Style::default().fg(COLOR_TEXT),
+        ),
     ]);
-    
+
     let inst_para = Paragraph::new(inst_text)
         .block(Block::default().borders(Borders::NONE))
         .alignment(ratatui::layout::Alignment::Center);
@@ -828,7 +994,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
 fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -838,10 +1004,21 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .split(area);
 
     let info_text = Paragraph::new(Line::from(vec![
-        Span::styled(" 🕒 HISTORICAL SESSION RUNS ", Style::default().fg(color_primary).bold()),
-        Span::styled(" (Queried in the background from local databases) ", Style::default().fg(COLOR_MUTED).italic()),
+        Span::styled(
+            " 🕒 HISTORICAL SESSION RUNS ",
+            Style::default().fg(color_primary).bold(),
+        ),
+        Span::styled(
+            " (Queried in the background from local databases) ",
+            Style::default().fg(COLOR_MUTED).italic(),
+        ),
     ]))
-    .block(Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(Style::default().fg(COLOR_MUTED)));
+    .block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED)),
+    );
     f.render_widget(info_text, chunks[0]);
 
     let mut rows = Vec::new();
@@ -854,7 +1031,6 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let agent_color = match agent.id {
             AgentId::Codex => COLOR_CODEX,
             AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::GeminiCli => COLOR_GEMINI,
             AgentId::Agy => COLOR_AGY,
             AgentId::Zed => COLOR_ZED,
         };
@@ -864,10 +1040,16 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
                 let session_id = format!("{:x}", 1395819581293u64 + idx as u64);
                 rows.push(Row::new(vec![
                     Cell::new(agent.name.clone()).style(Style::default().fg(agent_color).bold()),
-                    Cell::new(format!("sess_{}", &session_id[..8])).style(Style::default().fg(COLOR_TEXT)),
-                    Cell::new(format!("{}m ago", idx * 10 + 5)).style(Style::default().fg(COLOR_TEXT)),
+                    Cell::new(format!("sess_{}", &session_id[..8]))
+                        .style(Style::default().fg(COLOR_TEXT)),
+                    Cell::new(format!("{}m ago", idx * 10 + 5))
+                        .style(Style::default().fg(COLOR_TEXT)),
                     Cell::new("SUCCESS").style(Style::default().fg(COLOR_SUCCESS).bold()),
-                    Cell::new(format!("{} requests", agent.requests_count / agent.sessions_count)).style(Style::default().fg(COLOR_TEXT)),
+                    Cell::new(format!(
+                        "{} requests",
+                        agent.requests_count / agent.sessions_count
+                    ))
+                    .style(Style::default().fg(COLOR_TEXT)),
                 ]));
             }
         }
@@ -875,7 +1057,7 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     if rows.is_empty() {
         rows.push(Row::new(vec![
-            Cell::new("Gemini-CLI").style(Style::default().fg(COLOR_GEMINI).bold()),
+            Cell::new("Codex").style(Style::default().fg(COLOR_CODEX).bold()),
             Cell::new("dd34ff5a").style(Style::default().fg(COLOR_TEXT)),
             Cell::new("10m ago").style(Style::default().fg(COLOR_TEXT)),
             Cell::new("SUCCESS").style(Style::default().fg(COLOR_SUCCESS).bold()),
@@ -901,8 +1083,14 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ],
     )
     .header(
-        Row::new(vec!["AI Agent", "Session ID / Hash", "Time Elapsed", "Status", "Registered Requests"])
-            .style(Style::default().fg(color_primary).bold()),
+        Row::new(vec![
+            "AI Agent",
+            "Session ID / Hash",
+            "Time Elapsed",
+            "Status",
+            "Registered Requests",
+        ])
+        .style(Style::default().fg(color_primary).bold()),
     )
     .block(
         Block::default()
@@ -916,9 +1104,9 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     f.render_widget(sessions_table, chunks[1]);
 }
 
-fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
+fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -931,12 +1119,11 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     for (i, agent) in ctx.agents.iter().enumerate() {
         let is_selected = i == ctx.selected_agent_idx;
         let is_inst = agent.executable_path.is_some();
-        
+
         let prefix = if is_selected { "❯ " } else { "  " };
         let agent_color = match agent.id {
             AgentId::Codex => COLOR_CODEX,
             AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::GeminiCli => COLOR_GEMINI,
             AgentId::Agy => COLOR_AGY,
             AgentId::Zed => COLOR_ZED,
         };
@@ -953,26 +1140,44 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Style::default()
         };
 
-        rows.push(Row::new(vec![
-            Cell::new(format!("{}{}", prefix, agent.name)).style(Style::default().fg(agent_color).bold()),
-            Cell::new(agent.user_tier.display_name().to_string()).style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
-            Cell::new(match agent.quota_type {
-                crate::agent::QuotaType::Daily => "Daily",
-                crate::agent::QuotaType::Weekly => "Weekly",
-                crate::agent::QuotaType::Monthly => "Monthly",
-                crate::agent::QuotaType::Unlimited => "Unlimited",
-            }.to_string()).style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
-            Cell::new(if is_inst {
-                if agent.quota_type == crate::agent::QuotaType::Unlimited {
-                    "Unlimited".to_string()
+        rows.push(
+            Row::new(vec![
+                Cell::new(format!("{}{}", prefix, agent.name))
+                    .style(Style::default().fg(agent_color).bold()),
+                Cell::new(agent.user_tier.display_name().to_string())
+                    .style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
+                Cell::new(
+                    match agent.quota_type {
+                        crate::agent::QuotaType::Daily => "Daily",
+                        crate::agent::QuotaType::Weekly => "Weekly",
+                        crate::agent::QuotaType::Monthly => "Monthly",
+                        crate::agent::QuotaType::Unlimited => "Unlimited",
+                    }
+                    .to_string(),
+                )
+                .style(Style::default().fg(if is_inst {
+                    COLOR_TEXT
                 } else {
-                    format!("{} requests", agent.quota_limit)
-                }
-            } else {
-                "No Telemetry".to_string()
-            }).style(Style::default().fg(if is_inst { COLOR_TEXT } else { COLOR_MUTED })),
-            action_cell,
-        ]).style(row_style));
+                    COLOR_MUTED
+                })),
+                Cell::new(if is_inst {
+                    if agent.quota_type == crate::agent::QuotaType::Unlimited {
+                        "Unlimited".to_string()
+                    } else {
+                        format!("{} requests", agent.quota_limit)
+                    }
+                } else {
+                    "No Telemetry".to_string()
+                })
+                .style(Style::default().fg(if is_inst {
+                    COLOR_TEXT
+                } else {
+                    COLOR_MUTED
+                })),
+                action_cell,
+            ])
+            .style(row_style),
+        );
     }
 
     let budget_table = Table::new(
@@ -986,8 +1191,14 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ],
     )
     .header(
-        Row::new(vec!["AI Agent", "User Account Tier", "Frequency", "Configured Limit", "Action"])
-            .style(Style::default().fg(color_primary).bold()),
+        Row::new(vec![
+            "AI Agent",
+            "User Account Tier",
+            "Frequency",
+            "Configured Limit",
+            "Action",
+        ])
+        .style(Style::default().fg(color_primary).bold()),
     )
     .block(
         Block::default()
@@ -1033,9 +1244,9 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     f.render_widget(docs_para, chunks[1]);
 }
 
-fn draw_config_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
+fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -1046,11 +1257,31 @@ fn draw_config_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     let mut rows = Vec::new();
     let settings = [
-        ("TUI Active Color Theme", format!("< {:?} >", ctx.config.theme), "Customize TUI highlight brand accent"),
-        ("Telemetry Refresh Interval", format!("< {}ms >", ctx.config.refresh_rate_ms), "How often SQLite files are scanned"),
-        ("Soft Warning Threshold (%)", format!("< {}% >", ctx.config.soft_limit_percent as u32), "Usage warning threshold"),
-        ("Hard Warning Threshold (%)", format!("< {}% >", ctx.config.hard_limit_percent as u32), "Quota exceeded limit indicator"),
-        ("Manual Config JSON Editor", "[ Press Enter / e ]".to_string(), "Opens config.json in terminal $EDITOR"),
+        (
+            "TUI Active Color Theme",
+            format!("< {:?} >", ctx.config.theme),
+            "Customize TUI highlight brand accent",
+        ),
+        (
+            "Telemetry Refresh Interval",
+            format!("< {}ms >", ctx.config.refresh_rate_ms),
+            "How often SQLite files are scanned",
+        ),
+        (
+            "Soft Warning Threshold (%)",
+            format!("< {}% >", ctx.config.soft_limit_percent as u32),
+            "Usage warning threshold",
+        ),
+        (
+            "Hard Warning Threshold (%)",
+            format!("< {}% >", ctx.config.hard_limit_percent as u32),
+            "Quota exceeded limit indicator",
+        ),
+        (
+            "Manual Config JSON Editor",
+            "[ Press Enter / e ]".to_string(),
+            "Opens config.json in terminal $EDITOR",
+        ),
     ];
 
     for (i, &(name, ref val, desc)) in settings.iter().enumerate() {
@@ -1070,11 +1301,14 @@ fn draw_config_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
         let val_color = if i == 4 { COLOR_WARN } else { COLOR_SUCCESS };
 
-        rows.push(Row::new(vec![
-            Cell::new(format!("{}{}", prefix, name)).style(name_style),
-            Cell::new(val.clone()).style(Style::default().fg(val_color).bold()),
-            Cell::new(desc.to_string()).style(Style::default().fg(COLOR_MUTED)),
-        ]).style(row_style));
+        rows.push(
+            Row::new(vec![
+                Cell::new(format!("{}{}", prefix, name)).style(name_style),
+                Cell::new(val.clone()).style(Style::default().fg(val_color).bold()),
+                Cell::new(desc.to_string()).style(Style::default().fg(COLOR_MUTED)),
+            ])
+            .style(row_style),
+        );
     }
 
     let config_table = Table::new(
@@ -1086,8 +1320,12 @@ fn draw_config_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ],
     )
     .header(
-        Row::new(vec!["Configuration Setting", "Option Value", "Description / Purpose"])
-            .style(Style::default().fg(color_primary).bold()),
+        Row::new(vec![
+            "Configuration Setting",
+            "Option Value",
+            "Description / Purpose",
+        ])
+        .style(Style::default().fg(color_primary).bold()),
     )
     .block(
         Block::default()
@@ -1130,17 +1368,74 @@ fn draw_config_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
 fn draw_footer(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
-    let footer_text = Line::from(vec![
+
+    let mut footer_spans = vec![
         Span::styled(" Q/Esc ", Style::default().fg(color_primary).bold()),
         Span::styled("Exit  |  ", Style::default().fg(COLOR_TEXT)),
         Span::styled(" Tab/Arrows ", Style::default().fg(color_primary).bold()),
         Span::styled("Change Screen  |  ", Style::default().fg(COLOR_TEXT)),
-        Span::styled(" S ", Style::default().fg(color_primary).bold()),
-        Span::styled("Modify Quota  |  ", Style::default().fg(COLOR_TEXT)),
-        Span::styled(" Up/Down ", Style::default().fg(color_primary).bold()),
-        Span::styled("Select Item", Style::default().fg(COLOR_TEXT)),
-    ]);
+    ];
+
+    match ctx.active_tab {
+        1 | 3 => {
+            footer_spans.push(Span::styled(
+                " S ",
+                Style::default().fg(color_primary).bold(),
+            ));
+            footer_spans.push(Span::styled(
+                "Modify Quota  |  ",
+                Style::default().fg(COLOR_TEXT),
+            ));
+            footer_spans.push(Span::styled(
+                " Up/Down ",
+                Style::default().fg(color_primary).bold(),
+            ));
+            footer_spans.push(Span::styled(
+                "Select Agent",
+                Style::default().fg(COLOR_TEXT),
+            ));
+        }
+        4 => {
+            footer_spans.push(Span::styled(
+                " Up/Down ",
+                Style::default().fg(color_primary).bold(),
+            ));
+            footer_spans.push(Span::styled(
+                "Select Setting  |  ",
+                Style::default().fg(COLOR_TEXT),
+            ));
+            if ctx.selected_setting_idx == 4 {
+                footer_spans.push(Span::styled(
+                    " Enter/E ",
+                    Style::default().fg(color_primary).bold(),
+                ));
+                footer_spans.push(Span::styled("Open Editor", Style::default().fg(COLOR_TEXT)));
+            } else {
+                footer_spans.push(Span::styled(
+                    " Enter/l/+ ",
+                    Style::default().fg(color_primary).bold(),
+                ));
+                footer_spans.push(Span::styled("Next  ", Style::default().fg(COLOR_TEXT)));
+                footer_spans.push(Span::styled(
+                    " h/- ",
+                    Style::default().fg(color_primary).bold(),
+                ));
+                footer_spans.push(Span::styled("Prev", Style::default().fg(COLOR_TEXT)));
+            }
+        }
+        _ => {
+            footer_spans.push(Span::styled(
+                " R ",
+                Style::default().fg(color_primary).bold(),
+            ));
+            footer_spans.push(Span::styled(
+                "Force Refresh",
+                Style::default().fg(COLOR_TEXT),
+            ));
+        }
+    }
+
+    let footer_text = Line::from(footer_spans);
     let footer_widget = Paragraph::new(footer_text)
         .block(Block::default())
         .style(Style::default().fg(COLOR_MUTED));
@@ -1152,7 +1447,7 @@ use ratatui::widgets::Cell;
 
 fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let color_primary = get_primary_color(ctx.config.theme);
-    
+
     // Center popup logic
     let popup_layout = Layout::default()
         .direction(Direction::Vertical)
@@ -1173,18 +1468,21 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         .split(popup_layout[1]);
 
     let modal_rect = popup_chunks[1];
-    
+
     f.render_widget(Clear, modal_rect);
-    
+
     let active_agent = &ctx.agents[ctx.selected_agent_idx];
-    
+
     let modal_block = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Double)
         .border_style(Style::default().fg(color_primary))
         .bg(COLOR_CARD)
-        .title(format!(" CONFIGURE LIMIT: {} ", active_agent.name.to_uppercase()));
-    
+        .title(format!(
+            " CONFIGURE LIMIT: {} ",
+            active_agent.name.to_uppercase()
+        ));
+
     let inner_rect = modal_block.inner(modal_rect);
     f.render_widget(modal_block, modal_rect);
 
@@ -1203,10 +1501,14 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     let field_block = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(border_color));
-        
-    let cursor_suffix = if ctx.tick_count.is_multiple_of(2) { "█" } else { "" };
+
+    let cursor_suffix = if ctx.tick_count.is_multiple_of(2) {
+        "█"
+    } else {
+        ""
+    };
     let display_val = ctx.editing_value.to_string();
-    
+
     let row_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(22), Constraint::Min(5)])

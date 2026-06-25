@@ -5,14 +5,19 @@ Format: [keepachangelog.com](https://keepachangelog.com) · Versioning: [semver.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-06-25
+
 ### Added
 - New unit test module (`src/tests.rs`) covering Base64 decoding, JWT parsing, and configuration defaults.
 - Type alias `ScanResult` for better code readability in background scanning threads.
+- Proportional dynamic model limits mapping for Codex, OpenCode, Agy, and Zed based on user tiers and configuration.
+- Support for `custom` quota flag in configuration to track manually overridden limits from the TUI.
 
 ### Changed
 - Refactored `agent.rs` to use idiomatic Rust patterns (`saturating_sub`, `is_multiple_of`, `vec!`).
 - Updated architecture documentation (`docs/wiki/architecture.md`) with current design decisions and ADRs.
 - Improved development and hygiene guides in the wiki to reflect strict quality mandates.
+- Removed Gemini-CLI support completely from the application (removed logic, configuration parameters, and UI tables).
 
 ### Fixed
 - Resolved 23 code quality issues identified by Clippy (linting).

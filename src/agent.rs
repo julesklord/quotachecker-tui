@@ -1,18 +1,17 @@
+use crate::config::AppConfig;
+use chrono::Datelike;
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 use std::sync::{Mutex, OnceLock};
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use crate::config::AppConfig;
-use rusqlite::Connection;
-use chrono::Datelike;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AgentId {
     Codex,
     OpenCode,
-    GeminiCli,
     Agy,
     Zed,
 }
@@ -70,7 +69,7 @@ pub struct AgentState {
     pub config_path: Option<String>,
     pub is_authenticated: bool,
     pub auth_info: String,
-    
+
     // Quota stats
     pub quota_type: QuotaType,
     pub user_tier: UserTier,
@@ -78,13 +77,13 @@ pub struct AgentState {
     pub quota_limit: u32,
     pub quota_remaining: u32,
     pub seconds_until_reset: i64,
-    
+
     // Usage stats
     pub sessions_count: u32,
     pub requests_count: u32,
     pub tokens_used: Option<u64>,
     pub cost_usd: Option<f64>,
-    
+
     // Model breakdown
     pub model_usages: Vec<ModelUsage>,
 }
@@ -136,12 +135,15 @@ fn get_cached_version(executable: &str) -> Option<String> {
 }
 
 fn seconds_until_weekly_reset() -> i64 {
-    use chrono::{Local, Duration, TimeZone};
+    use chrono::{Duration, Local, TimeZone};
     let now = Local::now();
     let weekday_num = now.weekday().num_days_from_monday() as i64; // Mon=0, Tue=1, ..., Sun=6
     let days_until_monday = 7 - weekday_num;
     let next_monday_naive = now.date_naive() + Duration::days(days_until_monday);
-    if let Some(next_monday) = Local.from_local_datetime(&next_monday_naive.and_hms_opt(0, 0, 0).unwrap()).single() {
+    if let Some(next_monday) = Local
+        .from_local_datetime(&next_monday_naive.and_hms_opt(0, 0, 0).unwrap())
+        .single()
+    {
         next_monday.signed_duration_since(now).num_seconds()
     } else {
         days_until_monday * 24 * 3600
@@ -149,10 +151,13 @@ fn seconds_until_weekly_reset() -> i64 {
 }
 
 fn seconds_until_daily_reset() -> i64 {
-    use chrono::{Local, Duration, TimeZone};
+    use chrono::{Duration, Local, TimeZone};
     let now = Local::now();
     let tomorrow_naive = now.date_naive() + Duration::days(1);
-    if let Some(tomorrow) = Local.from_local_datetime(&tomorrow_naive.and_hms_opt(0, 0, 0).unwrap()).single() {
+    if let Some(tomorrow) = Local
+        .from_local_datetime(&tomorrow_naive.and_hms_opt(0, 0, 0).unwrap())
+        .single()
+    {
         tomorrow.signed_duration_since(now).num_seconds()
     } else {
         24 * 3600
@@ -160,19 +165,27 @@ fn seconds_until_daily_reset() -> i64 {
 }
 
 fn seconds_until_monthly_reset() -> i64 {
-    use chrono::{Local, Datelike, TimeZone};
+    use chrono::{Datelike, Local, TimeZone};
     let now = Local::now();
     let year = now.year();
     let month = now.month();
-    
+
     // Find first day of next month
     let (next_month, next_year) = if month == 12 {
         (1, year + 1)
     } else {
         (month + 1, year)
     };
-    
-    if let Some(next_month_dt) = Local.from_local_datetime(&chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1).unwrap().and_hms_opt(0, 0, 0).unwrap()).single() {
+
+    if let Some(next_month_dt) = Local
+        .from_local_datetime(
+            &chrono::NaiveDate::from_ymd_opt(next_year, next_month, 1)
+                .unwrap()
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        )
+        .single()
+    {
         next_month_dt.signed_duration_since(now).num_seconds()
     } else {
         30 * 24 * 3600 // fallback 30 days
@@ -185,12 +198,12 @@ pub(crate) fn base64_decode(input: &str) -> Option<Vec<u8>> {
     for (i, &c) in ALPHABET.iter().enumerate() {
         map[c as usize] = i as u8;
     }
-    
+
     let bytes = input.as_bytes();
     let mut out = Vec::new();
     let mut buffer = 0u32;
     let mut bits = 0;
-    
+
     for &b in bytes {
         if b == b'=' {
             break;
@@ -215,15 +228,13 @@ pub(crate) fn decode_jwt_payload(jwt: &str) -> Option<serde_json::Value> {
         return None;
     }
     let payload_b64 = parts[1];
-    
-    let mut b64 = payload_b64
-        .replace('-', "+")
-        .replace('_', "/");
-        
+
+    let mut b64 = payload_b64.replace('-', "+").replace('_', "/");
+
     while !b64.len().is_multiple_of(4) {
         b64.push('=');
     }
-    
+
     let decoded_bytes = base64_decode(&b64)?;
     serde_json::from_slice(&decoded_bytes).ok()
 }
@@ -233,43 +244,53 @@ fn parse_codex_auth(home_path: &Path) -> Option<(UserTier, String)> {
     if !auth_path.exists() {
         return None;
     }
-    
+
     let content = fs::read_to_string(auth_path).ok()?;
     let val: serde_json::Value = serde_json::from_str(&content).ok()?;
-    
+
     let tokens = val.get("tokens")?;
     let _access_token = tokens.get("access_token")?.as_str()?;
     let id_token = tokens.get("id_token")?.as_str()?;
-    
+
     let payload = decode_jwt_payload(id_token)?;
     let email = payload.get("email")?.as_str()?.to_string();
-    
+
     let auth_meta = payload.get("https://api.openai.com/auth")?;
     let plan = auth_meta.get("chatgpt_plan_type")?.as_str()?;
-    
+
     let tier = if plan == "free" {
         UserTier::OAuthPersonal
     } else {
         UserTier::OAuthEnterprise
     };
-    
+
     Some((tier, email))
 }
 
 fn get_git_identity() -> Option<(String, String)> {
     static CACHE: OnceLock<Option<(String, String)>> = OnceLock::new();
-    CACHE.get_or_init(|| {
-        let name_out = Command::new("git").args(["config", "--global", "user.name"]).output().ok()?;
-        let email_out = Command::new("git").args(["config", "--global", "user.email"]).output().ok()?;
-        if name_out.status.success() && email_out.status.success() {
-            let name = String::from_utf8_lossy(&name_out.stdout).trim().to_string();
-            let email = String::from_utf8_lossy(&email_out.stdout).trim().to_string();
-            if !name.is_empty() || !email.is_empty() {
-                return Some((name, email));
+    CACHE
+        .get_or_init(|| {
+            let name_out = Command::new("git")
+                .args(["config", "--global", "user.name"])
+                .output()
+                .ok()?;
+            let email_out = Command::new("git")
+                .args(["config", "--global", "user.email"])
+                .output()
+                .ok()?;
+            if name_out.status.success() && email_out.status.success() {
+                let name = String::from_utf8_lossy(&name_out.stdout).trim().to_string();
+                let email = String::from_utf8_lossy(&email_out.stdout)
+                    .trim()
+                    .to_string();
+                if !name.is_empty() || !email.is_empty() {
+                    return Some((name, email));
+                }
             }
-        }
-        None
-    }).clone()
+            None
+        })
+        .clone()
 }
 
 impl AgentScanner {
@@ -280,7 +301,9 @@ impl AgentScanner {
                 // If it succeeded, try finding its path with which
                 if let Ok(which_out) = Command::new("which").arg(cmd).output() {
                     if which_out.status.success() {
-                        let path = String::from_utf8_lossy(&which_out.stdout).trim().to_string();
+                        let path = String::from_utf8_lossy(&which_out.stdout)
+                            .trim()
+                            .to_string();
                         if !path.is_empty() {
                             return Some(path);
                         }
@@ -289,7 +312,7 @@ impl AgentScanner {
                 return Some(cmd.to_string());
             }
         }
-        
+
         // Try standard which command
         if let Ok(output) = Command::new("which").arg(cmd).output() {
             if output.status.success() {
@@ -313,7 +336,7 @@ impl AgentScanner {
                 return Some(path.clone());
             }
         }
-        
+
         None
     }
 
@@ -323,7 +346,7 @@ impl AgentScanner {
             .output()
             .or_else(|_| Command::new(executable).arg("-v").output())
             .ok()?;
-        
+
         if output.status.success() {
             let ver = String::from_utf8_lossy(&output.stdout).trim().to_string();
             let first_line = ver.lines().next().unwrap_or("").to_string();
@@ -331,14 +354,14 @@ impl AgentScanner {
                 return Some(first_line);
             }
         }
-        
+
         if executable.contains("codex") {
             return Some("v1.2.0".to_string());
         }
         if executable.contains("zeditor") {
             return Some("v2.1.0".to_string());
         }
-        
+
         None
     }
 
@@ -349,9 +372,9 @@ impl AgentScanner {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/home/julesklord".to_string());
             std::path::PathBuf::from(home)
         };
-        
+
         let mut agents = Vec::new();
-        
+
         // ----------------------------------------------------
         // 1. CODEX AGENT
         // ----------------------------------------------------
@@ -363,12 +386,16 @@ impl AgentScanner {
         } else {
             None
         };
-        
+
         let codex_installed = codex_exe.is_some();
-        let mut codex_tier = if codex_installed { UserTier::LocalFree } else { UserTier::NotInstalled };
+        let mut codex_tier = if codex_installed {
+            UserTier::LocalFree
+        } else {
+            UserTier::NotInstalled
+        };
         let mut codex_auth = false;
         let mut codex_auth_info = "Local Builder".to_string();
-        
+
         if codex_installed {
             if let Some((detected_tier, email)) = parse_codex_auth(&home_path) {
                 codex_auth = true;
@@ -376,30 +403,38 @@ impl AgentScanner {
                 codex_auth_info = email;
             }
         }
-        
+
         let mut codex_sessions = 0;
         let mut codex_requests = 0;
         let mut gpt5_count = 0;
         let mut gpt41_count = 0;
         let mut claude4_count = 0;
         let mut codex_tokens = 0u64;
-        
+
         if codex_installed {
             let codex_db_path = home_path.join(".codex/state_5.sqlite");
             if codex_db_path.exists() {
                 if let Ok(conn) = Connection::open_with_flags(
                     &codex_db_path,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
                 ) {
-                    if let Ok(count) = conn.query_row("SELECT count(*) FROM threads", [], |r| r.get::<_, u32>(0)) {
+                    let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
+                    if let Ok(count) =
+                        conn.query_row("SELECT count(*) FROM threads", [], |r| r.get::<_, u32>(0))
+                    {
                         codex_sessions = count;
                         codex_requests = count * 10;
                     }
-                    
-                    if let Ok(tokens) = conn.query_row("SELECT SUM(tokens_used) FROM threads", [], |r| r.get::<_, Option<f64>>(0)) {
+
+                    if let Ok(tokens) =
+                        conn.query_row("SELECT SUM(tokens_used) FROM threads", [], |r| {
+                            r.get::<_, Option<f64>>(0)
+                        })
+                    {
                         codex_tokens = tokens.unwrap_or(0.0) as u64;
                     }
-                    
+
                     if let Ok(mut stmt) = conn.prepare("SELECT model, count(*) FROM threads WHERE model IS NOT NULL AND model != '' GROUP BY model") {
                         if let Ok(mut rows) = stmt.query([]) {
                             while let Ok(Some(row)) = rows.next() {
@@ -420,36 +455,64 @@ impl AgentScanner {
                 }
             }
         }
-        
+
         if gpt5_count == 0 && gpt41_count == 0 && claude4_count == 0 && codex_requests > 0 {
             gpt5_count = codex_requests / 10;
             gpt41_count = (codex_requests * 5) / 10;
             claude4_count = codex_requests - gpt5_count - gpt41_count;
         }
-        
+
+        let default_tier_limit = match codex_tier {
+            UserTier::OAuthEnterprise => 2000,
+            UserTier::OAuthPersonal => 200,
+            UserTier::LocalFree => 50,
+            _ => 0,
+        };
+        let codex_limit = if config.codex_quota.custom {
+            config.codex_quota.limit
+        } else {
+            default_tier_limit
+        };
+
+        let (limit_gpt5, limit_gpt41, limit_claude47) = match codex_tier {
+            UserTier::OAuthEnterprise | UserTier::OAuthPersonal => (
+                (codex_limit as f64 * 0.25) as u32,
+                (codex_limit as f64 * 0.50) as u32,
+                (codex_limit as f64 * 0.75) as u32,
+            ),
+            UserTier::LocalFree => (
+                (codex_limit as f64 * 0.20) as u32,
+                (codex_limit as f64 * 0.40) as u32,
+                (codex_limit as f64 * 0.60) as u32,
+            ),
+            _ => (0, 0, 0),
+        };
         let codex_model_usages = vec![
             ModelUsage {
                 name: "gpt-5".to_string(),
                 requests_used: gpt5_count,
-                limit: *config.model_limits.get("gpt-5").unwrap_or(&50),
+                limit: limit_gpt5,
             },
             ModelUsage {
                 name: "gpt-4.1".to_string(),
                 requests_used: gpt41_count,
-                limit: *config.model_limits.get("gpt-4.1").unwrap_or(&100),
+                limit: limit_gpt41,
             },
             ModelUsage {
                 name: "claude-4.7".to_string(),
                 requests_used: claude4_count,
-                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+                limit: limit_claude47,
             },
         ];
-        
-        let codex_limit = config.codex_quota.limit;
+
         let codex_used = codex_requests;
         let codex_rem = codex_limit.saturating_sub(codex_used);
-        let codex_qtype = if codex_auth { QuotaType::Daily } else { QuotaType::Unlimited };
-        
+        let codex_qtype = if codex_auth {
+            QuotaType::Daily
+        } else {
+            QuotaType::Unlimited
+        };
+
         agents.push(AgentState {
             id: AgentId::Codex,
             name: "Codex".to_string(),
@@ -463,7 +526,11 @@ impl AgentScanner {
             quota_used: codex_used,
             quota_limit: codex_limit,
             quota_remaining: codex_rem,
-            seconds_until_reset: if codex_auth { seconds_until_daily_reset() } else { 0 },
+            seconds_until_reset: if codex_auth {
+                seconds_until_daily_reset()
+            } else {
+                0
+            },
             sessions_count: codex_sessions,
             requests_count: codex_requests,
             tokens_used: Some(codex_tokens),
@@ -482,19 +549,23 @@ impl AgentScanner {
         } else {
             None
         };
-        
+
         let mut opencode_sessions = 0;
         let mut opencode_requests = 0;
         let mut opencode_auth = false;
         let mut opencode_auth_info = "Not Authenticated".to_string();
-        let mut opencode_tier = if opencode_exe.is_some() { UserTier::Guest } else { UserTier::NotInstalled };
+        let mut opencode_tier = if opencode_exe.is_some() {
+            UserTier::Guest
+        } else {
+            UserTier::NotInstalled
+        };
         let mut ds_coder_count = 0;
         let mut ds_reasoner_count = 0;
         let mut opencode_tokens = 0u64;
         let mut opencode_cost = 0.0f64;
-        
+
         let mut opencode_provider = "DeepSeek".to_string(); // default if unknown/disconnected
-        
+
         let opencode_auth_paths = [
             home_path.join(".local/share/opencode/auth.json"),
             home_path.join(".config/opencode/auth.json"),
@@ -502,7 +573,7 @@ impl AgentScanner {
             home_path.join("AppData/Roaming/opencode/auth.json"),
             home_path.join("Library/Application Support/opencode/auth.json"),
         ];
-        
+
         for auth_path in &opencode_auth_paths {
             if auth_path.exists() {
                 if let Ok(content) = fs::read_to_string(auth_path) {
@@ -510,18 +581,27 @@ impl AgentScanner {
                         if let Some(obj) = val.as_object() {
                             if !obj.is_empty() {
                                 opencode_auth = true;
-                                if obj.contains_key("github-copilot") || obj.contains_key("github") || obj.contains_key("copilot") {
+                                if obj.contains_key("github-copilot")
+                                    || obj.contains_key("github")
+                                    || obj.contains_key("copilot")
+                                {
                                     opencode_provider = "GitHub Copilot".to_string();
                                 } else if obj.contains_key("openai") {
                                     opencode_provider = "OpenAI".to_string();
-                                } else if obj.contains_key("anthropic") || obj.contains_key("claude") {
+                                } else if obj.contains_key("anthropic")
+                                    || obj.contains_key("claude")
+                                {
                                     opencode_provider = "Anthropic Claude".to_string();
                                 } else if obj.contains_key("deepseek") {
                                     opencode_provider = "DeepSeek".to_string();
                                 } else if obj.contains_key("google") || obj.contains_key("gemini") {
                                     opencode_provider = "Google Gemini".to_string();
                                 } else {
-                                    let raw_key = obj.keys().next().unwrap_or(&"Custom API".to_string()).clone();
+                                    let raw_key = obj
+                                        .keys()
+                                        .next()
+                                        .unwrap_or(&"Custom API".to_string())
+                                        .clone();
                                     // Capitalize custom keys nicely
                                     let mut pretty = String::new();
                                     let mut next_cap = true;
@@ -538,18 +618,24 @@ impl AgentScanner {
                                     }
                                     opencode_provider = pretty;
                                 }
-                                
-                                if opencode_provider == "GitHub Copilot" || opencode_provider == "Anthropic Claude" {
+
+                                if opencode_provider == "GitHub Copilot"
+                                    || opencode_provider == "Anthropic Claude"
+                                {
                                     opencode_tier = UserTier::Enterprise;
                                 } else {
                                     opencode_tier = UserTier::PersonalFree;
                                 }
-                                
+
                                 // Rich fallback to Git identity if DB doesn't provide an email
                                 if let Some((git_name, git_email)) = get_git_identity() {
-                                    opencode_auth_info = format!("{} <{}> ({})", git_name, git_email, opencode_provider);
+                                    opencode_auth_info = format!(
+                                        "{} <{}> ({})",
+                                        git_name, git_email, opencode_provider
+                                    );
                                 } else {
-                                    opencode_auth_info = format!("Logged in ({})", opencode_provider);
+                                    opencode_auth_info =
+                                        format!("Logged in ({})", opencode_provider);
                                 }
                                 break;
                             }
@@ -558,7 +644,7 @@ impl AgentScanner {
                 }
             }
         }
-        
+
         // Fallback: Check standard API key environment variables for OpenCode authentication
         if !opencode_auth {
             let env_keys = [
@@ -577,29 +663,34 @@ impl AgentScanner {
                         opencode_provider = provider_name.to_string();
                         opencode_tier = UserTier::PersonalFree;
                         if let Some((git_name, git_email)) = get_git_identity() {
-                            opencode_auth_info = format!("{} <{}> (API: {})", git_name, git_email, opencode_provider);
+                            opencode_auth_info = format!(
+                                "{} <{}> (API: {})",
+                                git_name, git_email, opencode_provider
+                            );
                         } else {
-                            opencode_auth_info = format!("API Key Authenticated ({})", opencode_provider);
+                            opencode_auth_info =
+                                format!("API Key Authenticated ({})", opencode_provider);
                         }
                         break;
                     }
                 }
             }
         }
-        
+
         if opencode_exe.is_some() {
             let opencode_db_paths = [
                 home_path.join(".local/share/opencode/opencode.db"),
                 home_path.join(".config/opencode/opencode.db"),
                 home_path.join(".opencode/opencode.db"),
             ];
-            
+
             let mut db_conn = None;
             for db_path in &opencode_db_paths {
                 if db_path.exists() {
                     if let Ok(conn) = Connection::open_with_flags(
                         db_path,
-                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                            | rusqlite::OpenFlags::SQLITE_OPEN_URI,
                     ) {
                         let _ = conn.busy_timeout(std::time::Duration::from_millis(500)); // Prevent SQLITE_BUSY
                         db_conn = Some(conn);
@@ -607,7 +698,7 @@ impl AgentScanner {
                     }
                 }
             }
-            
+
             if let Some(conn) = db_conn {
                 let mut detected_email = String::new();
                 if let Ok(mut stmt) = conn.prepare("SELECT email FROM account LIMIT 1") {
@@ -620,7 +711,9 @@ impl AgentScanner {
                     }
                 }
                 if detected_email.is_empty() {
-                    if let Ok(mut stmt) = conn.prepare("SELECT email FROM control_account WHERE active = 1 LIMIT 1") {
+                    if let Ok(mut stmt) =
+                        conn.prepare("SELECT email FROM control_account WHERE active = 1 LIMIT 1")
+                    {
                         if let Ok(mut rows) = stmt.query([]) {
                             if let Ok(Some(row)) = rows.next() {
                                 if let Ok(email) = row.get::<_, String>(0) {
@@ -649,21 +742,27 @@ impl AgentScanner {
                         }
                     }
                 }
-                
+
                 if !detected_email.is_empty() {
                     opencode_auth = true;
                     opencode_auth_info = format!("{} ({})", detected_email, opencode_provider);
                 }
-                
-                if let Ok(count) = conn.query_row("SELECT count(*) FROM session", [], |r| r.get::<_, u32>(0)) {
+
+                if let Ok(count) =
+                    conn.query_row("SELECT count(*) FROM session", [], |r| r.get::<_, u32>(0))
+                {
                     opencode_sessions = count;
                 }
-                
-                if let Ok(count) = conn.query_row("SELECT count(*) FROM message", [], |r| r.get::<_, u32>(0)) {
+
+                if let Ok(count) =
+                    conn.query_row("SELECT count(*) FROM message", [], |r| r.get::<_, u32>(0))
+                {
                     opencode_requests = count;
                 }
-                
-                if let Ok(mut stmt) = conn.prepare("SELECT SUM(tokens_input + tokens_output), SUM(cost) FROM session") {
+
+                if let Ok(mut stmt) =
+                    conn.prepare("SELECT SUM(tokens_input + tokens_output), SUM(cost) FROM session")
+                {
                     if let Ok(mut rows) = stmt.query([]) {
                         if let Ok(Some(row)) = rows.next() {
                             let t: Option<f64> = row.get(0).ok();
@@ -673,7 +772,7 @@ impl AgentScanner {
                         }
                     }
                 }
-                
+
                 let mut ds_coder_db = 0;
                 let mut ds_reasoner_db = 0;
                 if let Ok(mut stmt) = conn.prepare("SELECT model, count(*) FROM session WHERE model IS NOT NULL AND model != '' GROUP BY model") {
@@ -695,77 +794,133 @@ impl AgentScanner {
                 }
             }
         }
-        
+
         if opencode_auth && opencode_requests == 0 {
             opencode_sessions = 3;
             opencode_requests = 24;
         }
-        
+
         if ds_coder_count == 0 && ds_reasoner_count == 0 && opencode_requests > 0 {
             ds_coder_count = (opencode_requests * 7) / 10;
             ds_reasoner_count = opencode_requests - ds_coder_count;
         }
-        
+
+        let default_tier_limit = match opencode_tier {
+            UserTier::Enterprise => 2000,
+            UserTier::PersonalFree => 1000,
+            UserTier::Guest => 200,
+            _ => 0,
+        };
+        let opencode_limit = if config.opencode_quota.custom {
+            config.opencode_quota.limit
+        } else {
+            default_tier_limit
+        };
+
         let mut opencode_model_usages = Vec::new();
         if opencode_provider == "GitHub Copilot" {
+            let (limit_gpt5, limit_gpt41, limit_claude47) = match opencode_tier {
+                UserTier::Enterprise => (
+                    (opencode_limit as f64 * 0.25) as u32,
+                    (opencode_limit as f64 * 0.50) as u32,
+                    (opencode_limit as f64 * 0.75) as u32,
+                ),
+                UserTier::PersonalFree | UserTier::Guest => (
+                    (opencode_limit as f64 * 0.05) as u32,
+                    (opencode_limit as f64 * 0.10) as u32,
+                    (opencode_limit as f64 * 0.15) as u32,
+                ),
+                _ => (0, 0, 0),
+            };
             opencode_model_usages.push(ModelUsage {
                 name: "gpt-5".to_string(),
                 requests_used: ds_reasoner_count / 10 + ds_coder_count / 10,
-                limit: *config.model_limits.get("gpt-5").unwrap_or(&50),
+                limit: limit_gpt5,
             });
             opencode_model_usages.push(ModelUsage {
                 name: "gpt-4.1".to_string(),
                 requests_used: (ds_reasoner_count * 5) / 10 + (ds_coder_count * 5) / 10,
-                limit: *config.model_limits.get("gpt-4.1").unwrap_or(&100),
+                limit: limit_gpt41,
             });
             opencode_model_usages.push(ModelUsage {
                 name: "claude-4.7".to_string(),
-                requests_used: opencode_requests - ((ds_reasoner_count * 6) / 10 + (ds_coder_count * 6) / 10),
-                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+                requests_used: opencode_requests
+                    - ((ds_reasoner_count * 6) / 10 + (ds_coder_count * 6) / 10),
+                limit: limit_claude47,
             });
             opencode_cost = 0.0; // Override to free for Copilot subscription
         } else if opencode_provider == "OpenAI" {
+            let (limit_gpt4o, limit_gpt4o_mini) = match opencode_tier {
+                UserTier::Enterprise => (
+                    (opencode_limit as f64 * 0.25) as u32,
+                    (opencode_limit as f64 * 1.0) as u32,
+                ),
+                UserTier::PersonalFree => (
+                    (opencode_limit as f64 * 0.05) as u32,
+                    (opencode_limit as f64 * 0.20) as u32,
+                ),
+                UserTier::Guest => (
+                    (opencode_limit as f64 * 0.05) as u32,
+                    (opencode_limit as f64 * 0.25) as u32,
+                ),
+                _ => (0, 0),
+            };
             opencode_model_usages.push(ModelUsage {
                 name: "gpt-4o".to_string(),
                 requests_used: ds_coder_count,
-                limit: *config.model_limits.get("gpt-4o").unwrap_or(&50),
+                limit: limit_gpt4o,
             });
             opencode_model_usages.push(ModelUsage {
                 name: "gpt-4o-mini".to_string(),
                 requests_used: ds_reasoner_count,
-                limit: *config.model_limits.get("gpt-4o-mini").unwrap_or(&200),
+                limit: limit_gpt4o_mini,
             });
         } else if opencode_provider == "Anthropic Claude" {
+            let limit_claude = match opencode_tier {
+                UserTier::Enterprise => (opencode_limit as f64 * 0.75) as u32,
+                UserTier::PersonalFree | UserTier::Guest => (opencode_limit as f64 * 0.15) as u32,
+                _ => 0,
+            };
             opencode_model_usages.push(ModelUsage {
                 name: "claude-4.7".to_string(),
                 requests_used: ds_coder_count,
-                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+                limit: limit_claude,
             });
             opencode_model_usages.push(ModelUsage {
                 name: "claude-4.7".to_string(),
                 requests_used: ds_reasoner_count,
-                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+                limit: limit_claude,
             });
         } else {
+            let (limit_ds_chat, limit_ds_reasoner) = match opencode_tier {
+                UserTier::Enterprise => (
+                    (opencode_limit as f64 * 0.75) as u32,
+                    (opencode_limit as f64 * 0.25) as u32,
+                ),
+                UserTier::PersonalFree | UserTier::Guest => (
+                    (opencode_limit as f64 * 0.15) as u32,
+                    (opencode_limit as f64 * 0.05) as u32,
+                ),
+                _ => (0, 0),
+            };
             opencode_model_usages.push(ModelUsage {
                 name: "deepseek-chat".to_string(),
                 requests_used: ds_coder_count,
-                limit: *config.model_limits.get("deepseek-chat").unwrap_or(&150),
+                limit: limit_ds_chat,
             });
             opencode_model_usages.push(ModelUsage {
                 name: "deepseek-reasoner".to_string(),
                 requests_used: ds_reasoner_count,
-                limit: *config.model_limits.get("deepseek-reasoner").unwrap_or(&50),
+                limit: limit_ds_reasoner,
             });
         }
-        
-        let opencode_limit = config.opencode_quota.limit;
+
         let opencode_used = opencode_requests;
         let opencode_rem = opencode_limit.saturating_sub(opencode_used);
-        
+
         let opencode_qtype = QuotaType::Monthly;
         let opencode_reset = seconds_until_monthly_reset();
-        
+
         agents.push(AgentState {
             id: AgentId::OpenCode,
             name: "OpenCode".to_string(),
@@ -779,7 +934,11 @@ impl AgentScanner {
             quota_used: opencode_used,
             quota_limit: opencode_limit,
             quota_remaining: opencode_rem,
-            seconds_until_reset: if opencode_tier != UserTier::NotInstalled { opencode_reset } else { 0 },
+            seconds_until_reset: if opencode_tier != UserTier::NotInstalled {
+                opencode_reset
+            } else {
+                0
+            },
             sessions_count: opencode_sessions,
             requests_count: opencode_requests,
             tokens_used: Some(opencode_tokens),
@@ -788,136 +947,7 @@ impl AgentScanner {
         });
 
         // ----------------------------------------------------
-        // 3. GEMINI-CLI AGENT
-        // ----------------------------------------------------
-        let gemini_exe = get_cached_executable("gemini");
-        let gemini_ver = gemini_exe.as_ref().and_then(|e| get_cached_version(e));
-        let gemini_config = home_path.join(".gemini");
-        let gemini_config_str = if gemini_config.exists() {
-            Some(gemini_config.to_string_lossy().to_string())
-        } else {
-            None
-        };
-        
-        let mut gemini_sessions = 0;
-        let mut gemini_requests = 0;
-        let mut gemini_auth = false;
-        let mut gemini_auth_info = "No API Key".to_string();
-        let mut gemini_tier = if gemini_exe.is_some() { UserTier::Guest } else { UserTier::NotInstalled };
-        
-        if gemini_exe.is_some() {
-            if std::env::var("GEMINI_API_KEY").is_ok() {
-                gemini_auth = true;
-                gemini_auth_info = "Environment Key Active".to_string();
-                gemini_tier = UserTier::ApiKeyStudio;
-            } else {
-                let gemini_env_path = home_path.join(".gemini/.env");
-                let mut env_key_found = false;
-                if gemini_env_path.exists() {
-                    if let Ok(content) = fs::read_to_string(gemini_env_path) {
-                        if content.contains("GEMINI_API_KEY") {
-                            env_key_found = true;
-                            gemini_auth = true;
-                            gemini_auth_info = "Configured Key Active".to_string();
-                            gemini_tier = UserTier::ApiKeyStudio;
-                        }
-                    }
-                }
-                
-                if !env_key_found {
-                    let accounts_json_path = home_path.join(".gemini/google_accounts.json");
-                    if accounts_json_path.exists() {
-                        if let Ok(content) = fs::read_to_string(accounts_json_path) {
-                            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
-                                if let Some(active_email) = val.get("active").and_then(|v| v.as_str()) {
-                                    gemini_auth = true;
-                                    gemini_auth_info = active_email.to_string();
-                                    let email_lower = active_email.to_lowercase();
-                                    if email_lower.ends_with("@gmail.com")
-                                        || email_lower.ends_with("@outlook.com")
-                                        || email_lower.ends_with("@hotmail.com")
-                                        || email_lower.ends_with("@yahoo.com")
-                                        || email_lower.ends_with("@icloud.com")
-                                    {
-                                        gemini_tier = UserTier::OAuthPersonal;
-                                    } else {
-                                        gemini_tier = UserTier::OAuthEnterprise;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            let conversations_dir = home_path.join(".gemini/antigravity/conversations");
-            if conversations_dir.exists() {
-                if let Ok(entries) = fs::read_dir(conversations_dir) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if path.extension().and_then(|s| s.to_str()) == Some("db") {
-                            gemini_sessions += 1;
-                            if let Ok(conn) = Connection::open_with_flags(
-                                &path,
-                                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
-                            ) {
-                                if let Ok(count) = conn.query_row("SELECT count(*) FROM steps", [], |r| r.get::<_, u32>(0)) {
-                                    gemini_requests += count;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        let mut gemini_flash_count = 0;
-        let mut gemini_pro_count = 0;
-        if gemini_requests > 0 {
-            gemini_flash_count = (gemini_requests * 8) / 10;
-            gemini_pro_count = gemini_requests - gemini_flash_count;
-        }
-        
-        let gemini_model_usages = vec![
-            ModelUsage {
-                name: "gemini-3.5-flash".to_string(),
-                requests_used: gemini_flash_count,
-                limit: *config.model_limits.get("gemini-3.5-flash").unwrap_or(&1500),
-            },
-            ModelUsage {
-                name: "gemini-3.1-pro".to_string(),
-                requests_used: gemini_pro_count,
-                limit: *config.model_limits.get("gemini-3.1-pro").unwrap_or(&50),
-            },
-        ];
-        
-        let gemini_limit = config.gemini_quota.limit;
-        let gemini_used = gemini_requests;
-        let gemini_rem = gemini_limit.saturating_sub(gemini_used);
-        
-        agents.push(AgentState {
-            id: AgentId::GeminiCli,
-            name: "Gemini-CLI".to_string(),
-            executable_path: gemini_exe,
-            version: gemini_ver,
-            config_path: gemini_config_str,
-            is_authenticated: gemini_auth,
-            auth_info: gemini_auth_info,
-            quota_type: QuotaType::Daily,
-            user_tier: gemini_tier,
-            quota_used: gemini_used,
-            quota_limit: gemini_limit,
-            quota_remaining: gemini_rem,
-            seconds_until_reset: if gemini_tier != UserTier::NotInstalled { seconds_until_daily_reset() } else { 0 },
-            sessions_count: gemini_sessions,
-            requests_count: gemini_requests,
-            tokens_used: None,
-            cost_usd: Some(0.0),
-            model_usages: gemini_model_usages,
-        });
-
-        // ----------------------------------------------------
-        // 4. AGY AGENT
+        // 3. AGY AGENT
         // ----------------------------------------------------
         let agy_exe = get_cached_executable("agy");
         let agy_ver = agy_exe.as_ref().and_then(|e| get_cached_version(e));
@@ -927,17 +957,21 @@ impl AgentScanner {
         } else {
             None
         };
-        
+
         let mut agy_sessions = 0;
         let mut agy_requests = 0;
         let mut agy_auth = false;
         let mut agy_auth_info = "Not Configured".to_string();
-        let agy_tier = if agy_exe.is_some() { UserTier::AdvancedCli } else { UserTier::NotInstalled };
-        
+        let agy_tier = if agy_exe.is_some() {
+            UserTier::AdvancedCli
+        } else {
+            UserTier::NotInstalled
+        };
+
         if agy_exe.is_some() && agy_config.exists() {
             agy_auth = true;
             agy_auth_info = "Ready".to_string();
-            
+
             let last_conv_path = agy_config.join("cache/last_conversations.json");
             if last_conv_path.exists() {
                 if let Ok(metadata) = fs::metadata(&last_conv_path) {
@@ -946,7 +980,7 @@ impl AgentScanner {
                     }
                 }
             }
-            
+
             let log_dir = agy_config.join("log");
             if log_dir.exists() {
                 if let Ok(entries) = fs::read_dir(&log_dir) {
@@ -954,7 +988,10 @@ impl AgentScanner {
                         let path = entry.path();
                         if path.extension().and_then(|s| s.to_str()) == Some("log") {
                             if let Ok(content) = fs::read_to_string(path) {
-                                let count = content.lines().filter(|l| l.contains("Command:") || l.contains("Prompt:")).count() as u32;
+                                let count = content
+                                    .lines()
+                                    .filter(|l| l.contains("Command:") || l.contains("Prompt:"))
+                                    .count() as u32;
                                 agy_requests += count;
                                 agy_sessions += 1;
                             }
@@ -963,34 +1000,51 @@ impl AgentScanner {
                 }
             }
         }
-        
+
         if agy_sessions > 0 && agy_requests == 0 {
             agy_requests = agy_sessions * 2;
         }
-        
+
         let log_dir = agy_config.join("log");
         let (mut agy_flash_count, mut agy_pro_count) = parse_agy_logs(&log_dir);
         if agy_flash_count == 0 && agy_pro_count == 0 && agy_requests > 0 {
             agy_flash_count = (agy_requests * 7) / 10;
             agy_pro_count = agy_requests - agy_flash_count;
         }
+
+        let default_tier_limit = match agy_tier {
+            UserTier::AdvancedCli => 500,
+            _ => 0,
+        };
+        let agy_limit = if config.agy_quota.custom {
+            config.agy_quota.limit
+        } else {
+            default_tier_limit
+        };
+
+        let (limit_flash, limit_pro) = match agy_tier {
+            UserTier::AdvancedCli => (
+                (agy_limit as f64 * 3.0) as u32,
+                (agy_limit as f64 * 0.1) as u32,
+            ),
+            _ => (0, 0),
+        };
         let agy_model_usages = vec![
             ModelUsage {
                 name: "Gemini 3.5 Flash".to_string(),
                 requests_used: agy_flash_count,
-                limit: *config.model_limits.get("Gemini 3.5 Flash").unwrap_or(&1500),
+                limit: limit_flash,
             },
             ModelUsage {
                 name: "Gemini 3.1 Pro".to_string(),
                 requests_used: agy_pro_count,
-                limit: *config.model_limits.get("Gemini 3.1 Pro").unwrap_or(&50),
+                limit: limit_pro,
             },
         ];
-        
-        let agy_limit = config.agy_quota.limit;
+
         let agy_used = agy_requests;
         let agy_rem = agy_limit.saturating_sub(agy_used);
-        
+
         agents.push(AgentState {
             id: AgentId::Agy,
             name: "Agy".to_string(),
@@ -1004,7 +1058,11 @@ impl AgentScanner {
             quota_used: agy_used,
             quota_limit: agy_limit,
             quota_remaining: agy_rem,
-            seconds_until_reset: if agy_tier != UserTier::NotInstalled { seconds_until_weekly_reset() } else { 0 },
+            seconds_until_reset: if agy_tier != UserTier::NotInstalled {
+                seconds_until_weekly_reset()
+            } else {
+                0
+            },
             sessions_count: agy_sessions / 2,
             requests_count: agy_requests,
             tokens_used: None,
@@ -1023,50 +1081,71 @@ impl AgentScanner {
         } else {
             None
         };
-        
+
         let zed_installed = zed_exe.is_some();
-        let zed_tier = if zed_installed { UserTier::OAuthPersonal } else { UserTier::NotInstalled };
+        let zed_tier = if zed_installed {
+            UserTier::OAuthPersonal
+        } else {
+            UserTier::NotInstalled
+        };
         let mut zed_sessions = 0;
         let mut zed_requests = 0;
-        
+
         if zed_installed {
             let zed_db_path = home_path.join(".local/share/zed/threads/threads.db");
             if zed_db_path.exists() {
                 if let Ok(conn) = Connection::open_with_flags(
                     &zed_db_path,
-                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY | rusqlite::OpenFlags::SQLITE_OPEN_URI,
+                    rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
+                        | rusqlite::OpenFlags::SQLITE_OPEN_URI,
                 ) {
-                    if let Ok(count) = conn.query_row("SELECT count(*) FROM threads", [], |r| r.get::<_, u32>(0)) {
+                    let _ = conn.busy_timeout(std::time::Duration::from_millis(500));
+                    if let Ok(count) =
+                        conn.query_row("SELECT count(*) FROM threads", [], |r| r.get::<_, u32>(0))
+                    {
                         zed_sessions = count;
                         zed_requests = count * 8; // estimate 8 requests per thread
                     }
                 }
             }
         }
-        
+
         let mut zed_sonnet_count = 0;
         let mut zed_haiku_count = 0;
         if zed_requests > 0 {
             zed_sonnet_count = (zed_requests * 8) / 10;
             zed_haiku_count = zed_requests - zed_sonnet_count;
         }
+        let default_tier_limit = match zed_tier {
+            UserTier::OAuthPersonal => 300,
+            _ => 0,
+        };
+        let zed_limit = if config.zed_quota.custom {
+            config.zed_quota.limit
+        } else {
+            default_tier_limit
+        };
+
+        let limit_claude = match zed_tier {
+            UserTier::OAuthPersonal => (zed_limit as f64 * 0.5) as u32,
+            _ => 0,
+        };
         let zed_model_usages = vec![
             ModelUsage {
                 name: "claude-4.7".to_string(),
                 requests_used: zed_sonnet_count,
-                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+                limit: limit_claude,
             },
             ModelUsage {
                 name: "claude-4.7".to_string(),
                 requests_used: zed_haiku_count,
-                limit: *config.model_limits.get("claude-4.7").unwrap_or(&150),
+                limit: limit_claude,
             },
         ];
-        
-        let zed_limit = config.zed_quota.limit;
+
         let zed_used = zed_requests;
         let zed_rem = zed_limit.saturating_sub(zed_used);
-        
+
         agents.push(AgentState {
             id: AgentId::Zed,
             name: "Zed Agent".to_string(),
@@ -1074,13 +1153,21 @@ impl AgentScanner {
             version: zed_ver,
             config_path: zed_config_str,
             is_authenticated: zed_installed,
-            auth_info: if zed_installed { "Zed Cloud".to_string() } else { "Not Configured".to_string() },
+            auth_info: if zed_installed {
+                "Zed Cloud".to_string()
+            } else {
+                "Not Configured".to_string()
+            },
             quota_type: QuotaType::Daily,
             user_tier: zed_tier,
             quota_used: zed_used,
             quota_limit: zed_limit,
             quota_remaining: zed_rem,
-            seconds_until_reset: if zed_installed { seconds_until_daily_reset() } else { 0 },
+            seconds_until_reset: if zed_installed {
+                seconds_until_daily_reset()
+            } else {
+                0
+            },
             sessions_count: zed_sessions,
             requests_count: zed_requests,
             tokens_used: None,
