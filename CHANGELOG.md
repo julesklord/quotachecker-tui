@@ -5,6 +5,11 @@ Format: [keepachangelog.com](https://keepachangelog.com) · Versioning: [semver.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-06-25
+
+### Fixed
+- Updated README.md with crates.io installation guide, corrected Agy database telemetry paths, and aligned config schema.
+
 ## [0.2.0] - 2026-06-25
 
 ### Added
