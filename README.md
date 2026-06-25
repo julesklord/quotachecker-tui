@@ -107,6 +107,23 @@ The config file is located at `~/.config/quotachecker-tui/config.json`.
 - `hard_limit_percent`: Percentage where gauges turn red indicating limit is reached.
 - `custom`: When set to `true`, the application respects your configured limit. When `false`, it defaults to the detected tier quota.
 
+## Technical Details
+
+### Telemetry & Tier Resolution
+- **Codex**: Parses `~/.codex/auth.json` to extract the JWT `id_token`. Decodes the payload and reads `https://api.openai.com/auth` -> `chatgpt_plan_type`. Plans matching `free` resolve to `OAuthPersonal` (200 daily requests); others resolve to `OAuthEnterprise` (2000 daily requests).
+- **OpenCode**: Searches for an active JSON key in `auth.json` across XDG config directories. Resolves the provider (`github-copilot`, `openai`, `anthropic`, `deepseek`, `google`). If Copilot or Anthropic is active, resolves to `Enterprise` (2000 monthly requests). Others resolve to `PersonalFree` (1000 monthly requests) or fallback to `Guest` (200 monthly requests).
+- **Agy**: Checks the presence of the `agy` binary in `$PATH` and scans `.gemini/antigravity-cli/log/` logs. Resolves to `AdvancedCli` (500 weekly requests).
+- **Zed**: Inspects `~/.local/share/zed/threads/threads.db`. Resolves to `OAuthPersonal` (300 daily requests).
+
+### Proportional Model Quotas
+Model quotas scale dynamically based on the resolved agent limit (`L`):
+- **Codex** (Enterprise/Personal): `gpt-5` (0.25 × L), `gpt-4.1` (0.50 × L), `claude-4.7` (0.75 × L).
+- **Codex** (LocalFree): `gpt-5` (0.20 × L), `gpt-4.1` (0.40 × L), `claude-4.7` (0.60 × L).
+- **OpenCode** (Copilot Enterprise): `gpt-5` (0.25 × L), `gpt-4.1` (0.50 × L), `claude-4.7` (0.75 × L).
+- **OpenCode** (Copilot PersonalFree/Guest): `gpt-5` (0.05 × L), `gpt-4.1` (0.10 × L), `claude-4.7` (0.15 × L).
+- **Agy**: `Gemini 3.5 Flash` (3.00 × L), `Gemini 3.1 Pro` (0.10 × L).
+- **Zed**: `claude-4.7` (0.50 × L).
+
 ## Architecture
 
 - **Asynchronous Telemetry**: A background thread reads SQLite databases using a `500ms` busy timeout to avoid write locks on active AI tools.
