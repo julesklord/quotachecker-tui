@@ -1,11 +1,12 @@
 # Tape for VHS to record the QuotaChecker TUI demo
 Output docs/demo.gif
 
-Set FontSize 15
-Set Width 1200
-Set Height 700
-Set Theme "Catppuccin Mocha"
-Set Padding 12
+Set FontSize 12
+Set FontFamily "ZedMono NFM"
+Set Width 1000
+Set Height 600
+Set Theme "TokyoNight"
+Set Padding 10
 
 # Hide the command to launch the app
 Hide
