@@ -2,7 +2,7 @@
 
 > Terminal dashboard for tracking AI agent quota usage across multiple providers.
 
-![version](https://img.shields.io/badge/version-0.1.0-blue?style=flat-square)
+![version](https://img.shields.io/badge/version-0.2.0-blue?style=flat-square)
 ![rust](https://img.shields.io/badge/rust-1.85+-orange?style=flat-square)
 ![license](https://img.shields.io/badge/license-MIT-green?style=flat-square)
 
@@ -16,13 +16,17 @@ QuotaChecker-TUI monitors request quotas and token usage for local AI coding age
 |-------|-------------|-------------|
 | **Codex** | `~/.codex/sessions.db` | Requests, tokens, cost |
 | **OpenCode** | `~/.config/opencode/` | Monthly requests, cost, tokens |
-| **Gemini CLI** | `~/.gemini/` | Daily requests (Pro/Free tiers) |
+| **Agy** | `~/.gemini/antigravity-cli/` | Weekly requests, Gemini models |
 | **Zed** | `~/.config/zed/` | Session tokens |
-| **Agy** | `~/.config/agy/` | Token usage |
 
 ## Installation
 
-### Cargo (recommended)
+### From crates.io (recommended)
+```bash
+cargo install quotachecker-tui
+```
+
+### From Git
 ```bash
 cargo install --git https://github.com/julesklord/quotachecker-tui
 ```
@@ -65,16 +69,34 @@ quotachecker-tui
 
 ## Configuration
 
-Config stored at `~/.config/quotachecker/config.json` (XDG-compliant).
+Config stored at `~/.config/quotachecker-tui/config.json` or equivalent user config path (XDG-compliant).
 
 ```json
 {
-  "scan_interval_secs": 2,
-  "theme": "dark",
-  "agents": {
-    "codex": { "enabled": true, "quota": { "monthly_requests": 500 } },
-    "opencode": { "enabled": true, "quota": { "monthly_requests": 1000 } },
-    "gemini": { "enabled": true, "quota": { "daily_requests": 50 } }
+  "refresh_rate_ms": 2000,
+  "soft_limit_percent": 80.0,
+  "hard_limit_percent": 100.0,
+  "theme": "Cyan",
+  "codex_quota": {
+    "limit": 200,
+    "custom": false
+  },
+  "opencode_quota": {
+    "limit": 1000,
+    "custom": false
+  },
+  "agy_quota": {
+    "limit": 500,
+    "custom": false
+  },
+  "zed_quota": {
+    "limit": 300,
+    "custom": false
+  },
+  "model_limits": {
+    "gpt-5": 50,
+    "gpt-4.1": 100,
+    "claude-4.7": 150
   }
 }
 ```
