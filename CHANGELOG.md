@@ -5,6 +5,35 @@ Format: [keepachangelog.com](https://keepachangelog.com) · Versioning: [semver.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-25
+
+### Changed
+- Complete TUI visual layout refinement for a significantly improved terminal experience.
+- Replaced static `●/○` pulse indicator in header with an animated braille spinner (`⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏`) and live agent count display.
+- Active tab now renders with solid background highlight (text on primary color) instead of foreground-only highlight.
+- Tab bar uses `│` dividers for cleaner visual separation.
+- Progress bars upgraded to gradient-style blocks (`█▓░`) for a smoother fill appearance.
+- Overview stat boxes now show contextual icons (`⬡`, `⬢`, `◈`) and values are vertically centered.
+- Quota gauge cards use `title_bottom` to display agent tier without consuming inner space.
+- Agent sidebar entries are visually separated with spacing; uninstalled agents render with `DIM` style.
+- "Not installed" agent panel replaced verbose text with structured centered lines and icons.
+- Agent detail hint bar replaced with inline keybind pills (`s`, `↑↓` with colored backgrounds).
+- Sessions table status column uses solid-background badge (` ✔ OK `) and session hashes highlighted in sky blue.
+- Quotas tab now has primary-colored border on the main table for visual hierarchy.
+- Settings tab main card uses primary-colored border; config path highlighted in `COLOR_INFO`.
+- Guide/Info panels use inline keybind pills instead of plain text shortcuts.
+- Budget modal re-centered using a pure `centered_rect()` helper, gains a dark background (`Rgb(18,20,28)`), shadow effect, `title_bottom` with controls, and shows the current limit before input.
+- Footer keybinds replaced with colored pill-style spans for all tabs.
+
+### Added
+- New `COLOR_INFO` (sky blue `Rgb(80,184,255)`) for informational text (hashes, paths, tier labels).
+- New `COLOR_DIM` for secondary/background chrome separating active content from UI structure.
+- New `spinner_frame()` helper for braille spinner animation.
+- New `ratio_color()` helper to centralize soft/hard threshold color logic.
+- New `centered_rect()` helper for modal positioning.
+- New `kpill()` helper to render keybind pill spans consistently across footer and hint bars.
+- Symbolic constants `SYM_ARROW`, `SYM_BLOCK_FULL`, `SYM_BLOCK_HALF`, `SYM_BLOCK_EMPTY`, `SYM_SEP` for consistent UI glyphs.
+
 ## [0.2.1] - 2026-06-25
 
 ### Fixed
