@@ -6,6 +6,8 @@
 
 A terminal dashboard to track usage limits and token consumption of your local AI coding assistants.
 
+![QuotaChecker-TUI Demo](docs/demo.gif)
+
 ## What it does
 
 Tracks requests and token usage in the background by querying the local database and log files of your installed coding assistants.
