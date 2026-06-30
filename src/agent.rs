@@ -164,9 +164,8 @@ fn seconds_until_daily_reset() -> i64 {
     }
 }
 
-fn seconds_until_monthly_reset() -> i64 {
+pub(crate) fn calculate_seconds_until_monthly_reset(now: chrono::DateTime<chrono::Local>) -> i64 {
     use chrono::{Datelike, Local, TimeZone};
-    let now = Local::now();
     let year = now.year();
     let month = now.month();
 
@@ -190,6 +189,10 @@ fn seconds_until_monthly_reset() -> i64 {
     } else {
         30 * 24 * 3600 // fallback 30 days
     }
+}
+
+fn seconds_until_monthly_reset() -> i64 {
+    calculate_seconds_until_monthly_reset(chrono::Local::now())
 }
 
 pub(crate) fn base64_decode(input: &str) -> Option<Vec<u8>> {

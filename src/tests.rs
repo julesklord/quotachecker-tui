@@ -80,4 +80,46 @@ mod tests {
         };
         assert_eq!(zed_limit(UserTier::OAuthPersonal), 300);
     }
+
+    #[test]
+    fn test_calculate_seconds_monthly_reset_mid_month() {
+        use crate::agent::calculate_seconds_until_monthly_reset;
+        use chrono::{Local, TimeZone};
+
+        let naive = chrono::NaiveDate::from_ymd_opt(2023, 5, 15)
+            .unwrap()
+            .and_hms_opt(12, 0, 0)
+            .unwrap();
+        let now = Local.from_local_datetime(&naive).single().unwrap();
+
+        let naive_next = chrono::NaiveDate::from_ymd_opt(2023, 6, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let expected_reset = Local.from_local_datetime(&naive_next).single().unwrap();
+
+        let expected_seconds = expected_reset.signed_duration_since(now).num_seconds();
+        assert_eq!(calculate_seconds_until_monthly_reset(now), expected_seconds);
+    }
+
+    #[test]
+    fn test_calculate_seconds_monthly_reset_year_boundary() {
+        use crate::agent::calculate_seconds_until_monthly_reset;
+        use chrono::{Local, TimeZone};
+
+        let naive = chrono::NaiveDate::from_ymd_opt(2023, 12, 15)
+            .unwrap()
+            .and_hms_opt(12, 0, 0)
+            .unwrap();
+        let now = Local.from_local_datetime(&naive).single().unwrap();
+
+        let naive_next = chrono::NaiveDate::from_ymd_opt(2024, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let expected_reset = Local.from_local_datetime(&naive_next).single().unwrap();
+
+        let expected_seconds = expected_reset.signed_duration_since(now).num_seconds();
+        assert_eq!(calculate_seconds_until_monthly_reset(now), expected_seconds);
+    }
 }
