@@ -17,16 +17,16 @@ const COLOR_CARD: Color = Color::Reset;
 const COLOR_TEXT: Color = Color::Rgb(220, 220, 228);
 const COLOR_MUTED: Color = Color::Rgb(105, 108, 120);
 const COLOR_DIM: Color = Color::Rgb(70, 72, 82);
-const COLOR_SUCCESS: Color = Color::Rgb(56, 214, 115);  // Vivid Emerald
-const COLOR_WARN: Color = Color::Rgb(251, 197, 49);      // Amber
-const COLOR_DANGER: Color = Color::Rgb(237, 76, 92);     // Crimson
-const COLOR_INFO: Color = Color::Rgb(80, 184, 255);      // Sky Blue
+const COLOR_SUCCESS: Color = Color::Rgb(56, 214, 115); // Vivid Emerald
+const COLOR_WARN: Color = Color::Rgb(251, 197, 49); // Amber
+const COLOR_DANGER: Color = Color::Rgb(237, 76, 92); // Crimson
+const COLOR_INFO: Color = Color::Rgb(80, 184, 255); // Sky Blue
 
 // ─── Agent Brand Colors ───────────────────────────────────────────────────────
-const COLOR_AGY: Color = Color::Rgb(168, 85, 247);      // Vivid Purple
+const COLOR_AGY: Color = Color::Rgb(168, 85, 247); // Vivid Purple
 const COLOR_OPENCODE: Color = Color::Rgb(20, 210, 170); // Teal
-const COLOR_CODEX: Color = Color::Rgb(249, 115, 22);    // Deep Orange
-const COLOR_ZED: Color = Color::Rgb(234, 100, 100);     // Coral
+const COLOR_CODEX: Color = Color::Rgb(249, 115, 22); // Deep Orange
+const COLOR_ZED: Color = Color::Rgb(234, 100, 100); // Coral
 
 // ─── UI Symbol Set ────────────────────────────────────────────────────────────
 const SYM_ARROW: &str = "❯";
@@ -200,12 +200,13 @@ fn draw_header(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     } else {
         Color::Rgb(30, 160, 80)
     };
-    let installed_count = ctx.agents.iter().filter(|a| a.executable_path.is_some()).count();
+    let installed_count = ctx
+        .agents
+        .iter()
+        .filter(|a| a.executable_path.is_some())
+        .count();
     let sync_text = Line::from(vec![
-        Span::styled(
-            format!(" {} ", spin),
-            Style::default().fg(pulse_color),
-        ),
+        Span::styled(format!(" {} ", spin), Style::default().fg(pulse_color)),
         Span::styled(
             format!("LIVE  {}/{} agents ", installed_count, ctx.agents.len()),
             Style::default().fg(COLOR_TEXT),
@@ -484,18 +485,8 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             format!("{} / {}", active_agents, ctx.agents.len()),
             color_primary,
         ),
-        (
-            "Requests",
-            "⬢",
-            total_requests.to_string(),
-            COLOR_SUCCESS,
-        ),
-        (
-            "Tokens",
-            "◈",
-            total_tokens_str,
-            COLOR_WARN,
-        ),
+        ("Requests", "⬢", total_requests.to_string(), COLOR_SUCCESS),
+        ("Tokens", "◈", total_tokens_str, COLOR_WARN),
         (
             "Est. Spend",
             "$",
@@ -513,7 +504,10 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             .alignment(Alignment::Center),
             Line::from(Span::styled(
                 val.clone(),
-                Style::default().fg(color).bold().add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(color)
+                    .bold()
+                    .add_modifier(Modifier::BOLD),
             ))
             .alignment(Alignment::Center),
         ];
@@ -651,10 +645,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             // Layout: [meta 35%] [gauge 65%]
             let card_layout = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(35),
-                    Constraint::Percentage(65),
-                ])
+                .constraints([Constraint::Percentage(35), Constraint::Percentage(65)])
                 .split(inner);
 
             // Left: Metadata column
@@ -674,20 +665,11 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             let label = if quota_type == crate::agent::QuotaType::Unlimited {
                 "∞  Unlimited Local".to_string()
             } else {
-                format!(
-                    "{:.1}%  {}/{} reqs",
-                    ratio * 100.0,
-                    quota_used,
-                    quota_limit
-                )
+                format!("{:.1}%  {}/{} reqs", ratio * 100.0, quota_used, quota_limit)
             };
 
             let gauge = Gauge::default()
-                .gauge_style(
-                    Style::default()
-                        .fg(bar_color)
-                        .bg(Color::Rgb(28, 30, 38)),
-                )
+                .gauge_style(Style::default().fg(bar_color).bg(Color::Rgb(28, 30, 38)))
                 .ratio(if quota_type == crate::agent::QuotaType::Unlimited {
                     1.0
                 } else {
@@ -743,20 +725,25 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
         // Add a top margin to visually separate agents
         if i > 0 {
-            list_items.push(ListItem::new(Line::from(""))
-                .style(Style::default()));
+            list_items.push(ListItem::new(Line::from("")).style(Style::default()));
         }
         list_items.push(ListItem::new(Line::from(vec![
             Span::styled(
                 format!("{} ", prefix),
-                Style::default().fg(if is_selected { item_color } else { COLOR_DIM }).bold(),
+                Style::default()
+                    .fg(if is_selected { item_color } else { COLOR_DIM })
+                    .bold(),
             ),
             Span::styled(status_dot, Style::default().fg(status_color)),
             Span::styled(agent.name.clone(), name_style),
         ])));
     }
 
-    let list_border_color = if ctx.active_tab == 1 { color_primary } else { COLOR_MUTED };
+    let list_border_color = if ctx.active_tab == 1 {
+        color_primary
+    } else {
+        COLOR_MUTED
+    };
     let agents_list = List::new(list_items).block(
         Block::default()
             .borders(Borders::ALL)
@@ -1114,19 +1101,14 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ],
     )
     .header(
-        Row::new(vec![
-            "  Model",
-            "Usage / Limit",
-            "Used %",
-            "Progress",
-        ])
-        .style(
-            Style::default()
-                .fg(color_primary)
-                .bold()
-                .add_modifier(Modifier::UNDERLINED),
-        )
-        .bottom_margin(1),
+        Row::new(vec!["  Model", "Usage / Limit", "Used %", "Progress"])
+            .style(
+                Style::default()
+                    .fg(color_primary)
+                    .bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            )
+            .bottom_margin(1),
     )
     .block(
         Block::default()
@@ -1144,9 +1126,15 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     // Quick Command Hint Bar
     let inst_text = Line::from(vec![
         Span::styled("  ", Style::default()),
-        Span::styled(" s ", Style::default().fg(Color::Black).bg(color_primary).bold()),
+        Span::styled(
+            " s ",
+            Style::default().fg(Color::Black).bg(color_primary).bold(),
+        ),
         Span::styled(" Modify quota limit  ", Style::default().fg(COLOR_MUTED)),
-        Span::styled(" ↑↓ ", Style::default().fg(Color::Black).bg(COLOR_DIM).bold()),
+        Span::styled(
+            " ↑↓ ",
+            Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+        ),
         Span::styled(" Navigate agents ", Style::default().fg(COLOR_MUTED)),
     ]);
 
@@ -1207,17 +1195,14 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             for idx in 0..agent.sessions_count.min(5) {
                 let session_id = format!("{:x}", 1395819581293u64 + idx as u64);
                 rows.push(Row::new(vec![
-                    Cell::new(format!("  {}", agent.name)).style(Style::default().fg(agent_color).bold()),
+                    Cell::new(format!("  {}", agent.name))
+                        .style(Style::default().fg(agent_color).bold()),
                     Cell::new(format!("#{}", &session_id[..8]))
                         .style(Style::default().fg(COLOR_INFO)),
                     Cell::new(format!("{}m ago", idx * 10 + 5))
                         .style(Style::default().fg(COLOR_MUTED)),
-                    Cell::new(" ✔ OK ").style(
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(COLOR_SUCCESS)
-                            .bold(),
-                    ),
+                    Cell::new(" ✔ OK ")
+                        .style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
                     Cell::new(format!(
                         "{} reqs",
                         agent.requests_count / agent.sessions_count
@@ -1233,18 +1218,14 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Cell::new("  Codex").style(Style::default().fg(COLOR_CODEX).bold()),
             Cell::new("#dd34ff5a").style(Style::default().fg(COLOR_INFO)),
             Cell::new("10m ago").style(Style::default().fg(COLOR_MUTED)),
-            Cell::new(" ✔ OK ").style(
-                Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold(),
-            ),
+            Cell::new(" ✔ OK ").style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
             Cell::new("12 reqs").style(Style::default().fg(COLOR_TEXT)),
         ]));
         rows.push(Row::new(vec![
             Cell::new("  Agy").style(Style::default().fg(COLOR_AGY).bold()),
             Cell::new("#5f2a3221").style(Style::default().fg(COLOR_INFO)),
             Cell::new("1h ago").style(Style::default().fg(COLOR_MUTED)),
-            Cell::new(" ✔ OK ").style(
-                Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold(),
-            ),
+            Cell::new(" ✔ OK ").style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
             Cell::new("4 reqs").style(Style::default().fg(COLOR_TEXT)),
         ]));
     }
@@ -1409,9 +1390,10 @@ fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     // ── Operations Guide ──────────────────────────────────────────────────────
     let docs_lines = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  HOW IT WORKS  ", Style::default().fg(color_primary).bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  HOW IT WORKS  ",
+            Style::default().fg(color_primary).bold(),
+        )]),
         Line::from(""),
         Line::from(Span::styled(
             "  QuotaChecker-CLI scans local databases and log files to track active",
@@ -1422,35 +1404,47 @@ fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Style::default().fg(COLOR_MUTED),
         )),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  KEYBINDS  ", Style::default().fg(color_primary).bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  KEYBINDS  ",
+            Style::default().fg(color_primary).bold(),
+        )]),
         Line::from(""),
         Line::from(vec![
             Span::styled("  ", Style::default()),
-            Span::styled(" Tab ", Style::default().fg(Color::Black).bg(COLOR_DIM).bold()),
+            Span::styled(
+                " Tab ",
+                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+            ),
             Span::styled("  Change screen   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(" ↑↓ ", Style::default().fg(Color::Black).bg(COLOR_DIM).bold()),
+            Span::styled(
+                " ↑↓ ",
+                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+            ),
             Span::styled("  Select agent   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(" s ", Style::default().fg(Color::Black).bg(color_primary).bold()),
+            Span::styled(
+                " s ",
+                Style::default().fg(Color::Black).bg(color_primary).bold(),
+            ),
             Span::styled("  Edit limit   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(" q ", Style::default().fg(Color::Black).bg(COLOR_DANGER).bold()),
+            Span::styled(
+                " q ",
+                Style::default().fg(Color::Black).bg(COLOR_DANGER).bold(),
+            ),
             Span::styled("  Quit", Style::default().fg(COLOR_MUTED)),
         ]),
     ];
 
-    let docs_para = Paragraph::new(docs_lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(COLOR_MUTED))
-                .bg(COLOR_CARD)
-                .title(Span::styled(
-                    " ≡ GUIDE ",
-                    Style::default().fg(COLOR_MUTED).bold(),
-                )),
-        );
+    let docs_para = Paragraph::new(docs_lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED))
+            .bg(COLOR_CARD)
+            .title(Span::styled(
+                " ≡ GUIDE ",
+                Style::default().fg(COLOR_MUTED).bold(),
+            )),
+    );
     f.render_widget(docs_para, chunks[1]);
 }
 
@@ -1530,18 +1524,14 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         ],
     )
     .header(
-        Row::new(vec![
-            "  Setting",
-            "Value",
-            "Description",
-        ])
-        .style(
-            Style::default()
-                .fg(color_primary)
-                .bold()
-                .add_modifier(Modifier::UNDERLINED),
-        )
-        .bottom_margin(1),
+        Row::new(vec!["  Setting", "Value", "Description"])
+            .style(
+                Style::default()
+                    .fg(color_primary)
+                    .bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            )
+            .bottom_margin(1),
     )
     .block(
         Block::default()
@@ -1563,9 +1553,10 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     let path_lines = vec![
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ⚙ CONFIG FILE  ", Style::default().fg(color_primary).bold()),
-        ]),
+        Line::from(vec![Span::styled(
+            "  ⚙ CONFIG FILE  ",
+            Style::default().fg(color_primary).bold(),
+        )]),
         Line::from(""),
         Line::from(vec![
             Span::styled("  Path: ", Style::default().fg(COLOR_MUTED)),
@@ -1583,25 +1574,30 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         Line::from(""),
         Line::from(vec![
             Span::styled("  ", Style::default()),
-            Span::styled(" ↑↓ ", Style::default().fg(Color::Black).bg(COLOR_DIM).bold()),
+            Span::styled(
+                " ↑↓ ",
+                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+            ),
             Span::styled("  Select   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(" ←→ / Enter ", Style::default().fg(Color::Black).bg(COLOR_DIM).bold()),
+            Span::styled(
+                " ←→ / Enter ",
+                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+            ),
             Span::styled("  Cycle value", Style::default().fg(COLOR_MUTED)),
         ]),
     ];
 
-    let path_para = Paragraph::new(path_lines)
-        .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(COLOR_MUTED))
-                .bg(COLOR_CARD)
-                .title(Span::styled(
-                    " ≡ CONFIGURATION INFO ",
-                    Style::default().fg(COLOR_MUTED).bold(),
-                )),
-        );
+    let path_para = Paragraph::new(path_lines).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(COLOR_MUTED))
+            .bg(COLOR_CARD)
+            .title(Span::styled(
+                " ≡ CONFIGURATION INFO ",
+                Style::default().fg(COLOR_MUTED).bold(),
+            )),
+    );
     f.render_widget(path_para, chunks[1]);
 }
 
@@ -1609,7 +1605,10 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 fn kpill<'a>(key: &'a str, label: &'a str, key_color: Color) -> Vec<Span<'a>> {
     vec![
         Span::styled(" ", Style::default()),
-        Span::styled(format!(" {} ", key), Style::default().fg(Color::Black).bg(key_color).bold()),
+        Span::styled(
+            format!(" {} ", key),
+            Style::default().fg(Color::Black).bg(key_color).bold(),
+        ),
         Span::styled(format!(" {} ", label), Style::default().fg(COLOR_MUTED)),
         Span::styled(SYM_SEP, Style::default().fg(COLOR_DIM)),
     ]
@@ -1716,29 +1715,67 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             format!("{} requests", active_agent.quota_limit),
             Style::default().fg(color_primary).bold(),
         ),
-        Span::styled("  →  Enter new limit:", Style::default().fg(COLOR_MUTED).italic()),
+        Span::styled(
+            "  →  Enter new limit:",
+            Style::default().fg(COLOR_MUTED).italic(),
+        ),
     ]));
     f.render_widget(hint, form_layout[0]);
 
     // Input row
-    let cursor_suffix = if ctx.tick_count.is_multiple_of(2) { "▌" } else { " " };
+    let cursor_suffix = if ctx.tick_count.is_multiple_of(2) {
+        "▌"
+    } else {
+        " "
+    };
     let display_val = ctx.editing_value.to_string();
+    let is_valid = display_val.parse::<u32>().is_ok();
 
     let row_chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Length(20), Constraint::Min(5)])
         .split(form_layout[2]);
 
-    let label_p = Paragraph::new(
-        Line::from(Span::styled(" Request Limit:", Style::default().fg(COLOR_MUTED))),
-    );
+    let label_p = Paragraph::new(Line::from(Span::styled(
+        " Request Limit:",
+        Style::default().fg(COLOR_MUTED),
+    )));
+
+    let (border_color, text_style, display_text) = if display_val.is_empty() {
+        (
+            COLOR_DANGER,
+            Style::default().fg(COLOR_DIM),
+            format!("Enter limit...{}", cursor_suffix),
+        )
+    } else if !is_valid {
+        (
+            COLOR_DANGER,
+            Style::default().fg(COLOR_DANGER).bold(),
+            format!("{}{}", display_val, cursor_suffix),
+        )
+    } else {
+        (
+            color_primary,
+            Style::default().fg(COLOR_TEXT).bold(),
+            format!("{}{}", display_val, cursor_suffix),
+        )
+    };
+
     let field_block = Block::default()
         .borders(Borders::BOTTOM)
-        .border_style(Style::default().fg(color_primary));
-    let val_p = Paragraph::new(format!("{}{}", display_val, cursor_suffix))
-        .style(Style::default().fg(COLOR_TEXT).bold())
+        .border_style(Style::default().fg(border_color));
+    let val_p = Paragraph::new(display_text)
+        .style(text_style)
         .block(field_block);
 
     f.render_widget(label_p, row_chunks[0]);
     f.render_widget(val_p, row_chunks[1]);
+
+    if !is_valid || display_val.is_empty() {
+        let warning_p = Paragraph::new(Line::from(Span::styled(
+            " ⚠ Valid number required",
+            Style::default().fg(COLOR_DANGER).italic(),
+        )));
+        f.render_widget(warning_p, form_layout[3]);
+    }
 }
