@@ -1214,62 +1214,73 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     }
 
     if rows.is_empty() {
-        rows.push(Row::new(vec![
-            Cell::new("  Codex").style(Style::default().fg(COLOR_CODEX).bold()),
-            Cell::new("#dd34ff5a").style(Style::default().fg(COLOR_INFO)),
-            Cell::new("10m ago").style(Style::default().fg(COLOR_MUTED)),
-            Cell::new(" ✔ OK ").style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
-            Cell::new("12 reqs").style(Style::default().fg(COLOR_TEXT)),
-        ]));
-        rows.push(Row::new(vec![
-            Cell::new("  Agy").style(Style::default().fg(COLOR_AGY).bold()),
-            Cell::new("#5f2a3221").style(Style::default().fg(COLOR_INFO)),
-            Cell::new("1h ago").style(Style::default().fg(COLOR_MUTED)),
-            Cell::new(" ✔ OK ").style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
-            Cell::new("4 reqs").style(Style::default().fg(COLOR_TEXT)),
-        ]));
-    }
-
-    let sessions_table = Table::new(
-        rows,
-        [
-            Constraint::Percentage(18),
-            Constraint::Percentage(22),
-            Constraint::Percentage(18),
-            Constraint::Percentage(14),
-            Constraint::Percentage(18),
-        ],
-    )
-    .header(
-        Row::new(vec![
-            "  Agent",
-            "Session Hash",
-            "Elapsed",
-            "Status",
-            "Requests",
-        ])
-        .style(
-            Style::default()
-                .fg(color_primary)
-                .bold()
-                .add_modifier(Modifier::UNDERLINED),
-        )
-        .bottom_margin(1),
-    )
-    .row_highlight_style(Style::default().bg(Color::Rgb(30, 32, 42)))
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(COLOR_MUTED))
-            .bg(COLOR_CARD)
-            .title(Span::styled(
-                " ◷ RECENT SESSIONS ",
-                Style::default().fg(COLOR_MUTED).bold(),
+        let empty_state_p = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(Span::styled(
+                "◌  No recent sessions found",
+                Style::default().fg(COLOR_MUTED).italic(),
             )),
-    );
+            Line::from(Span::styled(
+                "Make requests with your AI assistants to see them here.",
+                Style::default().fg(COLOR_DIM).italic(),
+            )),
+        ])
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_MUTED))
+                .bg(COLOR_CARD)
+                .title(Span::styled(
+                    " ◷ RECENT SESSIONS ",
+                    Style::default().fg(COLOR_MUTED).bold(),
+                )),
+        );
+        f.render_widget(empty_state_p, chunks[1]);
+    } else {
+        let sessions_table = Table::new(
+            rows,
+            [
+                Constraint::Percentage(18),
+                Constraint::Percentage(22),
+                Constraint::Percentage(18),
+                Constraint::Percentage(14),
+                Constraint::Percentage(18),
+            ],
+        )
+        .header(
+            Row::new(vec![
+                "  Agent",
+                "Session Hash",
+                "Elapsed",
+                "Status",
+                "Requests",
+            ])
+            .style(
+                Style::default()
+                    .fg(color_primary)
+                    .bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            )
+            .bottom_margin(1),
+        )
+        .row_highlight_style(Style::default().bg(Color::Rgb(30, 32, 42)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_MUTED))
+                .bg(COLOR_CARD)
+                .title(Span::styled(
+                    " ◷ RECENT SESSIONS ",
+                    Style::default().fg(COLOR_MUTED).bold(),
+                )),
+        );
 
-    f.render_widget(sessions_table, chunks[1]);
+        f.render_widget(sessions_table, chunks[1]);
+    }
 }
 
 fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
@@ -1740,7 +1751,6 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         " Request Limit:",
         Style::default().fg(COLOR_MUTED),
     )));
-
     let (border_color, text_style, display_text) = if display_val.is_empty() {
         (
             COLOR_DANGER,
@@ -1760,7 +1770,6 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             format!("{}{}", display_val, cursor_suffix),
         )
     };
-
     let field_block = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(border_color));
