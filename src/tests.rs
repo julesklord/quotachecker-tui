@@ -2,6 +2,10 @@
 mod tests {
     use crate::agent::{base64_decode, decode_jwt_payload};
     use crate::config::AppConfig;
+    use serial_test::serial;
+    use std::env;
+    use std::fs;
+    use tempfile::tempdir;
 
     #[test]
     fn test_base64_decode() {
@@ -79,5 +83,62 @@ mod tests {
             _ => 0,
         };
         assert_eq!(zed_limit(UserTier::OAuthPersonal), 300);
+    }
+
+    #[test]
+    #[serial]
+    fn test_config_save() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().to_owned();
+
+        // Save original environment variables to restore them later
+        let home = env::var("HOME").ok();
+        let xdg_config_home = env::var("XDG_CONFIG_HOME").ok();
+        let appdata = env::var("APPDATA").ok();
+
+        env::set_var("HOME", &path);
+        env::set_var("XDG_CONFIG_HOME", &path);
+        env::set_var("APPDATA", &path);
+
+        let mut config = AppConfig::default();
+        config.refresh_rate_ms = 9999;
+
+        // Obtain the dynamic config path
+        let config_path = AppConfig::config_path().expect("Should determine config path");
+
+        // Assert that the config is inside our temp directory
+        assert!(config_path.starts_with(&path));
+
+        let save_result = config.save();
+        assert!(
+            save_result.is_ok(),
+            "Failed to save config: {:?}",
+            save_result.err()
+        );
+
+        assert!(config_path.exists(), "Config file was not created");
+
+        let content = fs::read_to_string(&config_path).unwrap();
+        let loaded: AppConfig = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(loaded.refresh_rate_ms, 9999);
+        assert_eq!(loaded.theme, config.theme);
+
+        // Restore environment variables
+        if let Some(h) = home {
+            env::set_var("HOME", h);
+        } else {
+            env::remove_var("HOME");
+        }
+        if let Some(x) = xdg_config_home {
+            env::set_var("XDG_CONFIG_HOME", x);
+        } else {
+            env::remove_var("XDG_CONFIG_HOME");
+        }
+        if let Some(a) = appdata {
+            env::set_var("APPDATA", a);
+        } else {
+            env::remove_var("APPDATA");
+        }
     }
 }
