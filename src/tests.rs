@@ -236,4 +236,23 @@ exit 0").unwrap();
             "Reset should happen on a Monday"
         );
     }
+
+    #[test]
+    fn test_scan_all_agents() {
+        use crate::agent::{AgentScanner, AgentId};
+        let config = AppConfig::default();
+        let agents = AgentScanner::scan(&config);
+        assert_eq!(agents.len(), 9);
+
+        // Verify IDs are correct in order
+        assert_eq!(agents[0].id, AgentId::Codex);
+        assert_eq!(agents[1].id, AgentId::OpenCode);
+        assert_eq!(agents[2].id, AgentId::Agy);
+        assert_eq!(agents[3].id, AgentId::Zed);
+        assert_eq!(agents[4].id, AgentId::Aider);
+        assert_eq!(agents[5].id, AgentId::Ollama);
+        assert_eq!(agents[6].id, AgentId::Continue);
+        assert_eq!(agents[7].id, AgentId::Cody);
+        assert_eq!(agents[8].id, AgentId::Supermaven);
+    }
 }

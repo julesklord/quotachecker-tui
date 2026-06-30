@@ -5,6 +5,18 @@ Format: [keepachangelog.com](https://keepachangelog.com) · Versioning: [semver.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-30
+
+### Added
+- Compatibility for 5 new AI assistants: **Aider**, **Ollama**, **Continue**, **Cody**, and **Supermaven** (increasing monitored assistants from 4 to 9).
+- Brand styling/color tokens for Aider, Ollama, Continue, Cody, and Supermaven.
+- Comprehensive integration testing for all 9 agents' scanner order and ID assignments (`test_scan_all_agents`).
+- Version verification mock test coverage for Aider, Ollama, Continue, Cody, and Supermaven.
+
+### Changed
+- Refactored `src/ui.rs`'s agent color resolution into a single `get_agent_color(AgentId)` helper function to avoid duplicating patterns.
+- Expanded default model parameters and limits schema inside `AppConfig` for Aider, Ollama, Continue, Cody, and Supermaven (using `#[serde(default)]` to preserve backward compatibility).
+
 ## [0.4.0] - 2026-06-30
 
 ### Added

@@ -27,6 +27,11 @@ const COLOR_AGY: Color = Color::Rgb(168, 85, 247); // Vivid Purple
 const COLOR_OPENCODE: Color = Color::Rgb(20, 210, 170); // Teal
 const COLOR_CODEX: Color = Color::Rgb(249, 115, 22); // Deep Orange
 const COLOR_ZED: Color = Color::Rgb(234, 100, 100); // Coral
+const COLOR_AIDER: Color = Color::Rgb(14, 165, 233); // Sky Blue
+const COLOR_OLLAMA: Color = Color::Rgb(243, 244, 246); // Light Grey
+const COLOR_CONTINUE: Color = Color::Rgb(34, 197, 94); // Green
+const COLOR_CODY: Color = Color::Rgb(124, 58, 237); // Violet
+const COLOR_SUPERMAVEN: Color = Color::Rgb(236, 72, 153); // Vibrant Pink
 
 // ─── UI Symbol Set ────────────────────────────────────────────────────────────
 const SYM_ARROW: &str = "❯";
@@ -34,6 +39,20 @@ const SYM_BLOCK_FULL: &str = "█";
 const SYM_BLOCK_EMPTY: &str = "░";
 const SYM_BLOCK_HALF: &str = "▓";
 const SYM_SEP: &str = "│";
+
+fn get_agent_color(id: AgentId) -> Color {
+    match id {
+        AgentId::Codex => COLOR_CODEX,
+        AgentId::OpenCode => COLOR_OPENCODE,
+        AgentId::Agy => COLOR_AGY,
+        AgentId::Zed => COLOR_ZED,
+        AgentId::Aider => COLOR_AIDER,
+        AgentId::Ollama => COLOR_OLLAMA,
+        AgentId::Continue => COLOR_CONTINUE,
+        AgentId::Cody => COLOR_CODY,
+        AgentId::Supermaven => COLOR_SUPERMAVEN,
+    }
+}
 
 pub struct RenderContext<'a> {
     pub active_tab: usize,
@@ -251,12 +270,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let is_inst = agent.executable_path.is_some();
         let status_symbol = if is_inst { "✔" } else { "✘" };
         let status_color = if is_inst { COLOR_SUCCESS } else { COLOR_MUTED };
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         if is_inst {
             active_agents += 1;
@@ -325,12 +339,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     for agent in ctx.agents {
         let is_inst = agent.executable_path.is_some();
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         if !is_inst {
             chart_lines.push(Line::from(vec![
@@ -563,12 +572,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             }
         };
 
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         gauge_rows.push((
             agent.name.clone(),
@@ -702,12 +706,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let is_selected = i == ctx.selected_agent_idx;
         let is_inst = agent.executable_path.is_some();
 
-        let item_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let item_color = get_agent_color(agent.id);
 
         let (prefix, status_dot, status_color) = if is_inst {
             (SYM_ARROW, "● ", COLOR_SUCCESS)
@@ -759,12 +758,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     // Selected Agent details on the Right
     let selected_agent = &ctx.agents[ctx.selected_agent_idx];
-    let agent_color = match selected_agent.id {
-        AgentId::Codex => COLOR_CODEX,
-        AgentId::OpenCode => COLOR_OPENCODE,
-        AgentId::Agy => COLOR_AGY,
-        AgentId::Zed => COLOR_ZED,
-    };
+    let agent_color = get_agent_color(selected_agent.id);
 
     let is_inst = selected_agent.executable_path.is_some();
 
@@ -1184,12 +1178,7 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             continue; // Omit telemetry for uninstalled agents
         }
 
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         if agent.sessions_count > 0 {
             for idx in 0..agent.sessions_count.min(5) {
@@ -1300,12 +1289,7 @@ fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let is_inst = agent.executable_path.is_some();
 
         let prefix = if is_selected { "❯ " } else { "  " };
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         let action_cell = if is_inst {
             Cell::new("Modify (s)").style(Style::default().fg(color_primary).italic())
@@ -1687,12 +1671,7 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     f.render_widget(Clear, modal_rect);
 
     let active_agent = &ctx.agents[ctx.selected_agent_idx];
-    let agent_color = match active_agent.id {
-        AgentId::Codex => COLOR_CODEX,
-        AgentId::OpenCode => COLOR_OPENCODE,
-        AgentId::Agy => COLOR_AGY,
-        AgentId::Zed => COLOR_ZED,
-    };
+    let agent_color = get_agent_color(active_agent.id);
 
     let modal_block = Block::default()
         .borders(Borders::ALL)

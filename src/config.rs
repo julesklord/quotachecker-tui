@@ -46,6 +46,16 @@ pub struct AppConfig {
     pub agy_quota: AgentQuotaSettings,
     pub zed_quota: AgentQuotaSettings,
     #[serde(default)]
+    pub aider_quota: AgentQuotaSettings,
+    #[serde(default)]
+    pub ollama_quota: AgentQuotaSettings,
+    #[serde(default)]
+    pub continue_quota: AgentQuotaSettings,
+    #[serde(default)]
+    pub cody_quota: AgentQuotaSettings,
+    #[serde(default)]
+    pub supermaven_quota: AgentQuotaSettings,
+    #[serde(default)]
     pub model_limits: HashMap<String, u32>,
 }
 
@@ -86,6 +96,26 @@ impl Default for AppConfig {
             },
             zed_quota: AgentQuotaSettings {
                 limit: 300,
+                custom: false,
+            },
+            aider_quota: AgentQuotaSettings {
+                limit: 200,
+                custom: false,
+            },
+            ollama_quota: AgentQuotaSettings {
+                limit: 1000,
+                custom: false,
+            },
+            continue_quota: AgentQuotaSettings {
+                limit: 500,
+                custom: false,
+            },
+            cody_quota: AgentQuotaSettings {
+                limit: 400,
+                custom: false,
+            },
+            supermaven_quota: AgentQuotaSettings {
+                limit: 2000,
                 custom: false,
             },
             model_limits,
