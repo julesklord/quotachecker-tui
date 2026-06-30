@@ -4,6 +4,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+#[cfg(test)]
+thread_local! {
+    pub static TEST_CONFIG_PATH: std::cell::RefCell<Option<PathBuf>> = std::cell::RefCell::new(None);
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TuiTheme {
     #[default]
@@ -40,6 +45,7 @@ pub struct AppConfig {
     pub opencode_quota: AgentQuotaSettings,
     pub agy_quota: AgentQuotaSettings,
     pub zed_quota: AgentQuotaSettings,
+    #[serde(default)]
     pub model_limits: HashMap<String, u32>,
 }
 
@@ -88,9 +94,18 @@ impl Default for AppConfig {
 }
 
 impl AppConfig {
+    #[cfg(not(test))]
     pub fn config_path() -> Option<PathBuf> {
         ProjectDirs::from("com", "quotachecker-tui", "dashboard")
             .map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
+    }
+
+    #[cfg(test)]
+    pub fn config_path() -> Option<PathBuf> {
+        TEST_CONFIG_PATH.with(|p| p.borrow().clone()).or_else(|| {
+            ProjectDirs::from("com", "quotachecker-tui", "dashboard")
+                .map(|proj_dirs| proj_dirs.config_dir().join("config.json"))
+        })
     }
 
     pub fn load() -> Self {
@@ -123,5 +138,89 @@ impl AppConfig {
             fs::write(path, content)?;
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn set_test_config_path(path: Option<PathBuf>) {
+        TEST_CONFIG_PATH.with(|p| *p.borrow_mut() = path);
+    }
+
+    #[test]
+    fn test_load_non_existent_file() {
+        let dir = tempdir().unwrap();
+        let config_path = dir.path().join("config.json");
+        set_test_config_path(Some(config_path.clone()));
+
+        assert!(!config_path.exists());
+        let config = AppConfig::load();
+
+        assert!(config_path.exists());
+        assert_eq!(config.refresh_rate_ms, 2000);
+        assert_eq!(config.theme, TuiTheme::Cyan);
+    }
+
+    #[test]
+    fn test_load_existing_valid_file() {
+        let dir = tempdir().unwrap();
+        let config_path = dir.path().join("config.json");
+        set_test_config_path(Some(config_path.clone()));
+
+        let mut config = AppConfig::default();
+        config.refresh_rate_ms = 5000;
+        config.theme = TuiTheme::Amber;
+
+        let content = serde_json::to_string(&config).unwrap();
+        fs::write(&config_path, content).unwrap();
+
+        let loaded_config = AppConfig::load();
+        assert_eq!(loaded_config.refresh_rate_ms, 5000);
+        assert_eq!(loaded_config.theme, TuiTheme::Amber);
+    }
+
+    #[test]
+    fn test_load_legacy_file() {
+        let dir = tempdir().unwrap();
+        let config_path = dir.path().join("config.json");
+        set_test_config_path(Some(config_path.clone()));
+
+        let legacy_json = r#"{
+            "refresh_rate_ms": 3000,
+            "soft_limit_percent": 75.0,
+            "hard_limit_percent": 90.0,
+            "theme": "Purple",
+            "codex_quota": { "limit": 100, "custom": false },
+            "opencode_quota": { "limit": 100, "custom": false },
+            "agy_quota": { "limit": 100, "custom": false },
+            "zed_quota": { "limit": 100, "custom": false }
+        }"#;
+
+        fs::write(&config_path, legacy_json).unwrap();
+
+        let loaded_config = AppConfig::load();
+
+        assert_eq!(loaded_config.refresh_rate_ms, 3000);
+        assert!(!loaded_config.model_limits.is_empty());
+        assert_eq!(loaded_config.model_limits.get("gpt-5"), Some(&50));
+    }
+
+    #[test]
+    fn test_load_invalid_file() {
+        let dir = tempdir().unwrap();
+        let config_path = dir.path().join("config.json");
+        set_test_config_path(Some(config_path.clone()));
+
+        fs::write(&config_path, "invalid json format").unwrap();
+
+        let loaded_config = AppConfig::load();
+
+        assert_eq!(loaded_config.refresh_rate_ms, 2000);
+
+        let new_content = fs::read_to_string(&config_path).unwrap();
+        assert!(serde_json::from_str::<AppConfig>(&new_content).is_ok());
     }
 }
