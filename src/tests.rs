@@ -41,6 +41,77 @@ mod tests {
     }
 
     #[test]
+    fn test_check_executable_exists() {
+        use crate::agent::AgentScanner;
+        let result = AgentScanner::check_executable("cargo");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_check_executable_not_exists() {
+        use crate::agent::AgentScanner;
+        let result = AgentScanner::check_executable("this_command_absolutely_does_not_exist_12345");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_executable_fallback_path() {
+        use crate::agent::AgentScanner;
+        use std::env;
+        use std::fs;
+
+        struct HomeEnvGuard {
+            original_home: Option<String>,
+        }
+
+        impl HomeEnvGuard {
+            fn new(temp_home: &std::path::Path) -> Self {
+                let original_home = env::var("HOME").ok();
+                env::set_var("HOME", temp_home);
+                Self { original_home }
+            }
+        }
+
+        impl Drop for HomeEnvGuard {
+            fn drop(&mut self) {
+                if let Some(ref home) = self.original_home {
+                    env::set_var("HOME", home);
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
+        }
+
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let temp_dir = env::temp_dir().join(format!("quotachecker_test_home_{}", timestamp));
+        let bin_dir = temp_dir.join(".local/bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+
+        let _env_guard = HomeEnvGuard::new(&temp_dir);
+
+        let mock_cmd = format!("mock_cmd_for_test_{}", timestamp);
+        let mock_executable = bin_dir.join(&mock_cmd);
+        fs::write(&mock_executable, "#!/bin/sh
+exit 0").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&mock_executable).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&mock_executable, perms).unwrap();
+        }
+
+
+        let result = AgentScanner::check_executable(&mock_cmd);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+        assert_eq!(result, Some(mock_executable.to_string_lossy().to_string()));
+    }
+
+
+    #[test]
     fn test_tier_quota_limits() {
         use crate::agent::UserTier;
         // Verify Codex limits
