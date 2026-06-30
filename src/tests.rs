@@ -80,4 +80,23 @@ mod tests {
         };
         assert_eq!(zed_limit(UserTier::OAuthPersonal), 300);
     }
+
+    #[test]
+    fn test_seconds_until_daily_reset() {
+        use crate::agent::seconds_until_daily_reset;
+
+        let seconds = seconds_until_daily_reset();
+
+        // The time until next reset (midnight) should be greater than 0
+        assert!(
+            seconds > 0,
+            "Seconds until reset should be strictly positive"
+        );
+
+        // It shouldn't be more than 25 hours (90,000 seconds) in the worst case (accounting for DST transitions)
+        assert!(
+            seconds <= 90_000,
+            "Seconds until reset should be less than or equal to 25 hours"
+        );
+    }
 }

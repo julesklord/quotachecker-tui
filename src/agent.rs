@@ -150,7 +150,7 @@ fn seconds_until_weekly_reset() -> i64 {
     }
 }
 
-fn seconds_until_daily_reset() -> i64 {
+pub(crate) fn seconds_until_daily_reset() -> i64 {
     use chrono::{Duration, Local, TimeZone};
     let now = Local::now();
     let tomorrow_naive = now.date_naive() + Duration::days(1);
