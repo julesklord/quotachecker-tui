@@ -1790,3 +1790,31 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         f.render_widget(warning_p, form_layout[3]);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ratio_color() {
+        let soft = 0.8;
+        let hard = 1.0;
+
+        // ratio < soft -> COLOR_SUCCESS
+        assert_eq!(ratio_color(0.5, soft, hard), COLOR_SUCCESS);
+        assert_eq!(ratio_color(0.79, soft, hard), COLOR_SUCCESS);
+
+        // ratio == soft -> COLOR_WARN
+        assert_eq!(ratio_color(0.8, soft, hard), COLOR_WARN);
+
+        // soft < ratio < hard -> COLOR_WARN
+        assert_eq!(ratio_color(0.9, soft, hard), COLOR_WARN);
+        assert_eq!(ratio_color(0.99, soft, hard), COLOR_WARN);
+
+        // ratio == hard -> COLOR_DANGER
+        assert_eq!(ratio_color(1.0, soft, hard), COLOR_DANGER);
+
+        // ratio > hard -> COLOR_DANGER
+        assert_eq!(ratio_color(1.1, soft, hard), COLOR_DANGER);
+    }
+}
