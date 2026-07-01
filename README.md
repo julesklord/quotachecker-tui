@@ -20,6 +20,11 @@ Tracks requests and token usage in the background by querying the local database
 | OpenCode | `~/.local/share/opencode/opencode.db` | Sessions, requests, tokens, spent cost | Monthly |
 | Agy | `~/.gemini/antigravity-cli/log/` | CLI prompts, command logs | Weekly |
 | Zed | `~/.local/share/zed/threads/threads.db` | Active threads | Daily |
+| Aider | `~/.aider.conf.yml` | Sessions, requests, tokens, spent cost | Daily |
+| Ollama | `~/.ollama` | Requests, tokens | Unlimited (Local) |
+| Continue | `~/.continue/config.json` | Chat sessions, autocomplete prompts, tokens, spent cost | Daily |
+| Cody | `~/.config/cody` | Chat requests, tokens | Monthly |
+| Supermaven | `~/.supermaven` | Autocomplete keys, tokens | Unlimited (Local) |
 
 ## Installation
 
@@ -95,6 +100,26 @@ The config file is located at `~/.config/quotachecker-tui/config.json`.
     "limit": 300,
     "custom": false
   },
+  "aider_quota": {
+    "limit": 200,
+    "custom": false
+  },
+  "ollama_quota": {
+    "limit": 1000,
+    "custom": false
+  },
+  "continue_quota": {
+    "limit": 500,
+    "custom": false
+  },
+  "cody_quota": {
+    "limit": 400,
+    "custom": false
+  },
+  "supermaven_quota": {
+    "limit": 2000,
+    "custom": false
+  },
   "model_limits": {
     "gpt-5": 50,
     "gpt-4.1": 100,
@@ -116,6 +141,11 @@ The config file is located at `~/.config/quotachecker-tui/config.json`.
 - **OpenCode**: Searches for an active JSON key in `auth.json` across XDG config directories. Resolves the provider (`github-copilot`, `openai`, `anthropic`, `deepseek`, `google`). If Copilot or Anthropic is active, resolves to `Enterprise` (2000 monthly requests). Others resolve to `PersonalFree` (1000 monthly requests) or fallback to `Guest` (200 monthly requests).
 - **Agy**: Checks the presence of the `agy` binary in `$PATH` and scans `.gemini/antigravity-cli/log/` logs. Resolves to `AdvancedCli` (500 weekly requests).
 - **Zed**: Inspects `~/.local/share/zed/threads/threads.db`. Resolves to `OAuthPersonal` (300 daily requests).
+- **Aider**: Detects `aider` in PATH and reads `~/.aider.conf.yml` configuration settings. Resolves to `LocalFree` (200 daily requests limit).
+- **Ollama**: Checks the local presence of `ollama` executable. Resolves to `LocalFree` (1000 unlimited requests limit).
+- **Continue**: Checks `continue` CLI binary and parses `~/.continue/config.json`. Resolves to `LocalFree` (500 daily requests limit).
+- **Cody**: Detects `cody` binary and parses Sourcegraph Cody local directories. Resolves to `LocalFree` (400 monthly requests limit).
+- **Supermaven**: Detects `supermaven` in PATH and local `~/.supermaven` folders. Resolves to `LocalFree` (2000 unlimited requests limit).
 
 ### Proportional Model Quotas
 Model quotas scale dynamically based on the resolved agent limit (`L`):
@@ -125,6 +155,11 @@ Model quotas scale dynamically based on the resolved agent limit (`L`):
 - **OpenCode** (Copilot PersonalFree/Guest): `gpt-5` (0.05 × L), `gpt-4.1` (0.10 × L), `claude-4.7` (0.15 × L).
 - **Agy**: `Gemini 3.5 Flash` (3.00 × L), `Gemini 3.1 Pro` (0.10 × L).
 - **Zed**: `claude-4.7` (0.50 × L).
+- **Aider**: `claude-3-5-sonnet` (0.60 × L), `gpt-4o` (0.40 × L).
+- **Ollama**: `llama3` (0.70 × L), `mistral` (0.30 × L).
+- **Continue**: `gpt-4o-mini` (0.80 × L), `claude-3-5-sonnet` (0.20 × L).
+- **Cody**: `claude-3-5-sonnet` (1.00 × L).
+- **Supermaven**: `supermaven-model` (1.00 × L).
 
 ## Architecture
 

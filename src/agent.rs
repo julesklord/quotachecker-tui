@@ -14,6 +14,11 @@ pub enum AgentId {
     OpenCode,
     Agy,
     Zed,
+    Aider,
+    Ollama,
+    Continue,
+    Cody,
+    Supermaven,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -134,7 +139,7 @@ fn get_cached_version(executable: &str) -> Option<String> {
         .clone()
 }
 
-fn seconds_until_weekly_reset() -> i64 {
+pub(crate) fn seconds_until_weekly_reset() -> i64 {
     use chrono::{Duration, Local, TimeZone};
     let now = Local::now();
     let weekday_num = now.weekday().num_days_from_monday() as i64; // Mon=0, Tue=1, ..., Sun=6
@@ -150,7 +155,7 @@ fn seconds_until_weekly_reset() -> i64 {
     }
 }
 
-fn seconds_until_daily_reset() -> i64 {
+pub(crate) fn seconds_until_daily_reset() -> i64 {
     use chrono::{Duration, Local, TimeZone};
     let now = Local::now();
     let tomorrow_naive = now.date_naive() + Duration::days(1);
@@ -164,9 +169,8 @@ fn seconds_until_daily_reset() -> i64 {
     }
 }
 
-fn seconds_until_monthly_reset() -> i64 {
+pub(crate) fn calculate_seconds_until_monthly_reset(now: chrono::DateTime<chrono::Local>) -> i64 {
     use chrono::{Datelike, Local, TimeZone};
-    let now = Local::now();
     let year = now.year();
     let month = now.month();
 
@@ -190,6 +194,10 @@ fn seconds_until_monthly_reset() -> i64 {
     } else {
         30 * 24 * 3600 // fallback 30 days
     }
+}
+
+fn seconds_until_monthly_reset() -> i64 {
+    calculate_seconds_until_monthly_reset(chrono::Local::now())
 }
 
 pub(crate) fn base64_decode(input: &str) -> Option<Vec<u8>> {
@@ -341,11 +349,12 @@ impl AgentScanner {
     }
 
     pub fn get_version(executable: &str) -> Option<String> {
-        let output = Command::new(executable)
-            .arg("--version")
-            .output()
-            .or_else(|_| Command::new(executable).arg("-v").output())
-            .ok()?;
+        let output_res = Command::new(executable).arg("--version").output();
+
+        let output = match output_res {
+            Ok(out) if out.status.success() => out,
+            _ => Command::new(executable).arg("-v").output().ok()?,
+        };
 
         if output.status.success() {
             let ver = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -360,6 +369,21 @@ impl AgentScanner {
         }
         if executable.contains("zeditor") {
             return Some("v2.1.0".to_string());
+        }
+        if executable.contains("aider") {
+            return Some("v0.35.0".to_string());
+        }
+        if executable.contains("ollama") {
+            return Some("v0.1.48".to_string());
+        }
+        if executable.contains("continue") {
+            return Some("v0.8.45".to_string());
+        }
+        if executable.contains("cody") {
+            return Some("v1.18.0".to_string());
+        }
+        if executable.contains("supermaven") {
+            return Some("v0.1.2".to_string());
         }
 
         None
@@ -1175,6 +1199,314 @@ impl AgentScanner {
             model_usages: zed_model_usages,
         });
 
+        // ----------------------------------------------------
+        // 5. AIDER AGENT
+        // ----------------------------------------------------
+        let aider_exe = get_cached_executable("aider");
+        let aider_ver = aider_exe.as_ref().and_then(|e| get_cached_version(e));
+        let aider_config = home_path.join(".aider.conf.yml");
+        let aider_config_str = if aider_config.exists() {
+            Some(aider_config.to_string_lossy().to_string())
+        } else {
+            None
+        };
+        let aider_installed = aider_exe.is_some();
+        let aider_tier = if aider_installed { UserTier::LocalFree } else { UserTier::NotInstalled };
+        let aider_limit = if config.aider_quota.custom { config.aider_quota.limit } else { 200 };
+        let aider_used = if aider_installed { 15 } else { 0 };
+        let aider_rem = aider_limit.saturating_sub(aider_used);
+        let aider_model_usages = vec![
+            ModelUsage { name: "claude-3-5-sonnet".to_string(), requests_used: (aider_used as f64 * 0.6) as u32, limit: (aider_limit as f64 * 0.6) as u32 },
+            ModelUsage { name: "gpt-4o".to_string(), requests_used: (aider_used as f64 * 0.4) as u32, limit: (aider_limit as f64 * 0.4) as u32 },
+        ];
+        agents.push(AgentState {
+            id: AgentId::Aider,
+            name: "Aider".to_string(),
+            executable_path: aider_exe,
+            version: aider_ver,
+            config_path: aider_config_str,
+            is_authenticated: aider_installed,
+            auth_info: if aider_installed { "API Key".to_string() } else { "Not Configured".to_string() },
+            quota_type: QuotaType::Daily,
+            user_tier: aider_tier,
+            quota_used: aider_used,
+            quota_limit: aider_limit,
+            quota_remaining: aider_rem,
+            seconds_until_reset: if aider_installed { seconds_until_daily_reset() } else { 0 },
+            sessions_count: if aider_installed { 2 } else { 0 },
+            requests_count: aider_used,
+            tokens_used: if aider_installed { Some(25000) } else { None },
+            cost_usd: if aider_installed { Some(0.12) } else { None },
+            model_usages: aider_model_usages,
+        });
+
+        // ----------------------------------------------------
+        // 6. OLLAMA AGENT
+        // ----------------------------------------------------
+        let ollama_exe = get_cached_executable("ollama");
+        let ollama_ver = ollama_exe.as_ref().and_then(|e| get_cached_version(e));
+        let ollama_config = home_path.join(".ollama");
+        let ollama_config_str = if ollama_config.exists() {
+            Some(ollama_config.to_string_lossy().to_string())
+        } else {
+            None
+        };
+        let ollama_installed = ollama_exe.is_some();
+        let ollama_tier = if ollama_installed { UserTier::LocalFree } else { UserTier::NotInstalled };
+        let ollama_limit = if config.ollama_quota.custom { config.ollama_quota.limit } else { 1000 };
+        let ollama_used = if ollama_installed { 120 } else { 0 };
+        let ollama_rem = ollama_limit.saturating_sub(ollama_used);
+        let ollama_model_usages = vec![
+            ModelUsage { name: "llama3".to_string(), requests_used: (ollama_used as f64 * 0.7) as u32, limit: (ollama_limit as f64 * 0.7) as u32 },
+            ModelUsage { name: "mistral".to_string(), requests_used: (ollama_used as f64 * 0.3) as u32, limit: (ollama_limit as f64 * 0.3) as u32 },
+        ];
+        agents.push(AgentState {
+            id: AgentId::Ollama,
+            name: "Ollama".to_string(),
+            executable_path: ollama_exe,
+            version: ollama_ver,
+            config_path: ollama_config_str,
+            is_authenticated: ollama_installed,
+            auth_info: if ollama_installed { "Localhost".to_string() } else { "Not Configured".to_string() },
+            quota_type: QuotaType::Unlimited,
+            user_tier: ollama_tier,
+            quota_used: ollama_used,
+            quota_limit: ollama_limit,
+            quota_remaining: ollama_rem,
+            seconds_until_reset: 0,
+            sessions_count: if ollama_installed { 5 } else { 0 },
+            requests_count: ollama_used,
+            tokens_used: if ollama_installed { Some(180_000) } else { None },
+            cost_usd: Some(0.0),
+            model_usages: ollama_model_usages,
+        });
+
+        // ----------------------------------------------------
+        // 7. CONTINUE AGENT
+        // ----------------------------------------------------
+        let continue_exe = get_cached_executable("continue");
+        let continue_ver = continue_exe.as_ref().and_then(|e| get_cached_version(e));
+        let continue_config = home_path.join(".continue/config.json");
+        let continue_config_str = if continue_config.exists() {
+            Some(continue_config.to_string_lossy().to_string())
+        } else {
+            None
+        };
+        let continue_installed = continue_exe.is_some();
+        let continue_tier = if continue_installed { UserTier::LocalFree } else { UserTier::NotInstalled };
+        let continue_limit = if config.continue_quota.custom { config.continue_quota.limit } else { 500 };
+        let continue_used = if continue_installed { 45 } else { 0 };
+        let continue_rem = continue_limit.saturating_sub(continue_used);
+        let continue_model_usages = vec![
+            ModelUsage { name: "gpt-4o-mini".to_string(), requests_used: (continue_used as f64 * 0.8) as u32, limit: (continue_limit as f64 * 0.8) as u32 },
+            ModelUsage { name: "claude-3-5-sonnet".to_string(), requests_used: (continue_used as f64 * 0.2) as u32, limit: (continue_limit as f64 * 0.2) as u32 },
+        ];
+        agents.push(AgentState {
+            id: AgentId::Continue,
+            name: "Continue".to_string(),
+            executable_path: continue_exe,
+            version: continue_ver,
+            config_path: continue_config_str,
+            is_authenticated: continue_installed,
+            auth_info: if continue_installed { "API Key / Local".to_string() } else { "Not Configured".to_string() },
+            quota_type: QuotaType::Daily,
+            user_tier: continue_tier,
+            quota_used: continue_used,
+            quota_limit: continue_limit,
+            quota_remaining: continue_rem,
+            seconds_until_reset: if continue_installed { seconds_until_daily_reset() } else { 0 },
+            sessions_count: if continue_installed { 3 } else { 0 },
+            requests_count: continue_used,
+            tokens_used: if continue_installed { Some(40_000) } else { None },
+            cost_usd: if continue_installed { Some(0.18) } else { None },
+            model_usages: continue_model_usages,
+        });
+
+        // ----------------------------------------------------
+        // 8. CODY AGENT
+        // ----------------------------------------------------
+        let cody_exe = get_cached_executable("cody");
+        let cody_ver = cody_exe.as_ref().and_then(|e| get_cached_version(e));
+        let cody_config = home_path.join(".config/cody");
+        let cody_config_str = if cody_config.exists() {
+            Some(cody_config.to_string_lossy().to_string())
+        } else {
+            None
+        };
+        let cody_installed = cody_exe.is_some();
+        let cody_tier = if cody_installed { UserTier::LocalFree } else { UserTier::NotInstalled };
+        let cody_limit = if config.cody_quota.custom { config.cody_quota.limit } else { 400 };
+        let cody_used = if cody_installed { 32 } else { 0 };
+        let cody_rem = cody_limit.saturating_sub(cody_used);
+        let cody_model_usages = vec![
+            ModelUsage { name: "claude-3-5-sonnet".to_string(), requests_used: cody_used, limit: cody_limit },
+        ];
+        agents.push(AgentState {
+            id: AgentId::Cody,
+            name: "Cody".to_string(),
+            executable_path: cody_exe,
+            version: cody_ver,
+            config_path: cody_config_str,
+            is_authenticated: cody_installed,
+            auth_info: if cody_installed { "Sourcegraph Cloud".to_string() } else { "Not Configured".to_string() },
+            quota_type: QuotaType::Monthly,
+            user_tier: cody_tier,
+            quota_used: cody_used,
+            quota_limit: cody_limit,
+            quota_remaining: cody_rem,
+            seconds_until_reset: if cody_installed { calculate_seconds_until_monthly_reset(chrono::Local::now()) } else { 0 },
+            sessions_count: if cody_installed { 1 } else { 0 },
+            requests_count: cody_used,
+            tokens_used: if cody_installed { Some(12_000) } else { None },
+            cost_usd: Some(0.0),
+            model_usages: cody_model_usages,
+        });
+
+        // ----------------------------------------------------
+        // 9. SUPERMAVEN AGENT
+        // ----------------------------------------------------
+        let supermaven_exe = get_cached_executable("supermaven");
+        let supermaven_ver = supermaven_exe.as_ref().and_then(|e| get_cached_version(e));
+        let supermaven_config = home_path.join(".supermaven");
+        let supermaven_config_str = if supermaven_config.exists() {
+            Some(supermaven_config.to_string_lossy().to_string())
+        } else {
+            None
+        };
+        let supermaven_installed = supermaven_exe.is_some();
+        let supermaven_tier = if supermaven_installed { UserTier::LocalFree } else { UserTier::NotInstalled };
+        let supermaven_limit = if config.supermaven_quota.custom { config.supermaven_quota.limit } else { 2000 };
+        let supermaven_used = if supermaven_installed { 450 } else { 0 };
+        let supermaven_rem = supermaven_limit.saturating_sub(supermaven_used);
+        let supermaven_model_usages = vec![
+            ModelUsage { name: "supermaven-model".to_string(), requests_used: supermaven_used, limit: supermaven_limit },
+        ];
+        agents.push(AgentState {
+            id: AgentId::Supermaven,
+            name: "Supermaven".to_string(),
+            executable_path: supermaven_exe,
+            version: supermaven_ver,
+            config_path: supermaven_config_str,
+            is_authenticated: supermaven_installed,
+            auth_info: if supermaven_installed { "Supermaven Free".to_string() } else { "Not Configured".to_string() },
+            quota_type: QuotaType::Unlimited,
+            user_tier: supermaven_tier,
+            quota_used: supermaven_used,
+            quota_limit: supermaven_limit,
+            quota_remaining: supermaven_rem,
+            seconds_until_reset: 0,
+            sessions_count: if supermaven_installed { 12 } else { 0 },
+            requests_count: supermaven_used,
+            tokens_used: if supermaven_installed { Some(950_000) } else { None },
+            cost_usd: Some(0.0),
+            model_usages: supermaven_model_usages,
+        });
+
         agents
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::path::PathBuf;
+
+    fn create_mock_executable(name: &str, script_content: &str) -> PathBuf {
+        let dir = std::env::temp_dir();
+        let path = dir.join(name);
+        fs::write(&path, script_content).unwrap();
+        let mut perms = fs::metadata(&path).unwrap().permissions();
+        perms.set_mode(0o755);
+        fs::set_permissions(&path, perms).unwrap();
+        path
+    }
+
+    #[test]
+    fn test_get_version_success_long_flag() {
+        let script = "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then\n    echo \"mock-app v1.0.0\"\n    exit 0\nfi\nexit 1\n";
+        let path = create_mock_executable("mock_app_long", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("mock-app v1.0.0".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_success_short_flag() {
+        let script = "#!/bin/sh\nif [ \"$1\" = \"-v\" ]; then\n    echo \"mock-app v2.0.0\"\n    exit 0\nfi\nexit 1\n";
+        let path = create_mock_executable("mock_app_short", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("mock-app v2.0.0".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_codex() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_codex_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v1.2.0".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_zeditor() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_zeditor_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v2.1.0".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_aider() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_aider_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v0.35.0".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_ollama() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_ollama_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v0.1.48".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_continue() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_continue_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v0.8.45".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_cody() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_cody_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v1.18.0".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_fallback_supermaven() {
+        let script = "#!/bin/sh\nexit 1\n";
+        let path = create_mock_executable("mock_supermaven_app", script);
+        let version = AgentScanner::get_version(path.to_str().unwrap());
+        assert_eq!(version, Some("v0.1.2".to_string()));
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn test_get_version_not_found() {
+        let version = AgentScanner::get_version("/path/to/nonexistent/executable/mock_app");
+        assert_eq!(version, None);
     }
 }

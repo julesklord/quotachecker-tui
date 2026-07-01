@@ -27,6 +27,11 @@ const COLOR_AGY: Color = Color::Rgb(168, 85, 247); // Vivid Purple
 const COLOR_OPENCODE: Color = Color::Rgb(20, 210, 170); // Teal
 const COLOR_CODEX: Color = Color::Rgb(249, 115, 22); // Deep Orange
 const COLOR_ZED: Color = Color::Rgb(234, 100, 100); // Coral
+const COLOR_AIDER: Color = Color::Rgb(14, 165, 233); // Sky Blue
+const COLOR_OLLAMA: Color = Color::Rgb(243, 244, 246); // Light Grey
+const COLOR_CONTINUE: Color = Color::Rgb(34, 197, 94); // Green
+const COLOR_CODY: Color = Color::Rgb(124, 58, 237); // Violet
+const COLOR_SUPERMAVEN: Color = Color::Rgb(236, 72, 153); // Vibrant Pink
 
 // ─── UI Symbol Set ────────────────────────────────────────────────────────────
 const SYM_ARROW: &str = "❯";
@@ -34,6 +39,20 @@ const SYM_BLOCK_FULL: &str = "█";
 const SYM_BLOCK_EMPTY: &str = "░";
 const SYM_BLOCK_HALF: &str = "▓";
 const SYM_SEP: &str = "│";
+
+fn get_agent_color(id: AgentId) -> Color {
+    match id {
+        AgentId::Codex => COLOR_CODEX,
+        AgentId::OpenCode => COLOR_OPENCODE,
+        AgentId::Agy => COLOR_AGY,
+        AgentId::Zed => COLOR_ZED,
+        AgentId::Aider => COLOR_AIDER,
+        AgentId::Ollama => COLOR_OLLAMA,
+        AgentId::Continue => COLOR_CONTINUE,
+        AgentId::Cody => COLOR_CODY,
+        AgentId::Supermaven => COLOR_SUPERMAVEN,
+    }
+}
 
 pub struct RenderContext<'a> {
     pub active_tab: usize,
@@ -170,11 +189,11 @@ fn draw_header(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     // ── 2. Navigation Tabs ────────────────────────────────────────────────────
     let tab_titles = vec![
-        " Overview ",
-        " AI Agents ",
-        " Sessions ",
-        " Quotas ",
-        " Settings ",
+        " 1 Overview ",
+        " 2 AI Agents ",
+        " 3 Sessions ",
+        " 4 Quotas ",
+        " 5 Settings ",
     ];
     let tabs = Tabs::new(tab_titles)
         .select(ctx.active_tab)
@@ -251,12 +270,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let is_inst = agent.executable_path.is_some();
         let status_symbol = if is_inst { "✔" } else { "✘" };
         let status_color = if is_inst { COLOR_SUCCESS } else { COLOR_MUTED };
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         if is_inst {
             active_agents += 1;
@@ -325,12 +339,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     for agent in ctx.agents {
         let is_inst = agent.executable_path.is_some();
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         if !is_inst {
             chart_lines.push(Line::from(vec![
@@ -563,12 +572,7 @@ fn draw_overview_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             }
         };
 
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         gauge_rows.push((
             agent.name.clone(),
@@ -702,12 +706,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let is_selected = i == ctx.selected_agent_idx;
         let is_inst = agent.executable_path.is_some();
 
-        let item_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let item_color = get_agent_color(agent.id);
 
         let (prefix, status_dot, status_color) = if is_inst {
             (SYM_ARROW, "● ", COLOR_SUCCESS)
@@ -759,12 +758,7 @@ fn draw_agents_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
 
     // Selected Agent details on the Right
     let selected_agent = &ctx.agents[ctx.selected_agent_idx];
-    let agent_color = match selected_agent.id {
-        AgentId::Codex => COLOR_CODEX,
-        AgentId::OpenCode => COLOR_OPENCODE,
-        AgentId::Agy => COLOR_AGY,
-        AgentId::Zed => COLOR_ZED,
-    };
+    let agent_color = get_agent_color(selected_agent.id);
 
     let is_inst = selected_agent.executable_path.is_some();
 
@@ -1184,12 +1178,7 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             continue; // Omit telemetry for uninstalled agents
         }
 
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         if agent.sessions_count > 0 {
             for idx in 0..agent.sessions_count.min(5) {
@@ -1214,62 +1203,73 @@ fn draw_sessions_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     }
 
     if rows.is_empty() {
-        rows.push(Row::new(vec![
-            Cell::new("  Codex").style(Style::default().fg(COLOR_CODEX).bold()),
-            Cell::new("#dd34ff5a").style(Style::default().fg(COLOR_INFO)),
-            Cell::new("10m ago").style(Style::default().fg(COLOR_MUTED)),
-            Cell::new(" ✔ OK ").style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
-            Cell::new("12 reqs").style(Style::default().fg(COLOR_TEXT)),
-        ]));
-        rows.push(Row::new(vec![
-            Cell::new("  Agy").style(Style::default().fg(COLOR_AGY).bold()),
-            Cell::new("#5f2a3221").style(Style::default().fg(COLOR_INFO)),
-            Cell::new("1h ago").style(Style::default().fg(COLOR_MUTED)),
-            Cell::new(" ✔ OK ").style(Style::default().fg(Color::Black).bg(COLOR_SUCCESS).bold()),
-            Cell::new("4 reqs").style(Style::default().fg(COLOR_TEXT)),
-        ]));
-    }
-
-    let sessions_table = Table::new(
-        rows,
-        [
-            Constraint::Percentage(18),
-            Constraint::Percentage(22),
-            Constraint::Percentage(18),
-            Constraint::Percentage(14),
-            Constraint::Percentage(18),
-        ],
-    )
-    .header(
-        Row::new(vec![
-            "  Agent",
-            "Session Hash",
-            "Elapsed",
-            "Status",
-            "Requests",
-        ])
-        .style(
-            Style::default()
-                .fg(color_primary)
-                .bold()
-                .add_modifier(Modifier::UNDERLINED),
-        )
-        .bottom_margin(1),
-    )
-    .row_highlight_style(Style::default().bg(Color::Rgb(30, 32, 42)))
-    .block(
-        Block::default()
-            .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(COLOR_MUTED))
-            .bg(COLOR_CARD)
-            .title(Span::styled(
-                " ◷ RECENT SESSIONS ",
-                Style::default().fg(COLOR_MUTED).bold(),
+        let empty_state_p = Paragraph::new(vec![
+            Line::from(""),
+            Line::from(""),
+            Line::from(Span::styled(
+                "◌  No recent sessions found",
+                Style::default().fg(COLOR_MUTED).italic(),
             )),
-    );
+            Line::from(Span::styled(
+                "Make requests with your AI assistants to see them here.",
+                Style::default().fg(COLOR_DIM).italic(),
+            )),
+        ])
+        .alignment(Alignment::Center)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_MUTED))
+                .bg(COLOR_CARD)
+                .title(Span::styled(
+                    " ◷ RECENT SESSIONS ",
+                    Style::default().fg(COLOR_MUTED).bold(),
+                )),
+        );
+        f.render_widget(empty_state_p, chunks[1]);
+    } else {
+        let sessions_table = Table::new(
+            rows,
+            [
+                Constraint::Percentage(18),
+                Constraint::Percentage(22),
+                Constraint::Percentage(18),
+                Constraint::Percentage(14),
+                Constraint::Percentage(18),
+            ],
+        )
+        .header(
+            Row::new(vec![
+                "  Agent",
+                "Session Hash",
+                "Elapsed",
+                "Status",
+                "Requests",
+            ])
+            .style(
+                Style::default()
+                    .fg(color_primary)
+                    .bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            )
+            .bottom_margin(1),
+        )
+        .row_highlight_style(Style::default().bg(Color::Rgb(30, 32, 42)))
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(COLOR_MUTED))
+                .bg(COLOR_CARD)
+                .title(Span::styled(
+                    " ◷ RECENT SESSIONS ",
+                    Style::default().fg(COLOR_MUTED).bold(),
+                )),
+        );
 
-    f.render_widget(sessions_table, chunks[1]);
+        f.render_widget(sessions_table, chunks[1]);
+    }
 }
 
 fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
@@ -1289,12 +1289,7 @@ fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         let is_inst = agent.executable_path.is_some();
 
         let prefix = if is_selected { "❯ " } else { "  " };
-        let agent_color = match agent.id {
-            AgentId::Codex => COLOR_CODEX,
-            AgentId::OpenCode => COLOR_OPENCODE,
-            AgentId::Agy => COLOR_AGY,
-            AgentId::Zed => COLOR_ZED,
-        };
+        let agent_color = get_agent_color(agent.id);
 
         let action_cell = if is_inst {
             Cell::new("Modify (s)").style(Style::default().fg(color_primary).italic())
@@ -1409,29 +1404,37 @@ fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Style::default().fg(color_primary).bold(),
         )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(
-                " Tab ",
-                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
-            ),
-            Span::styled("  Change screen   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(
-                " ↑↓ ",
-                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
-            ),
-            Span::styled("  Select agent   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(
-                " s ",
-                Style::default().fg(Color::Black).bg(color_primary).bold(),
-            ),
-            Span::styled("  Edit limit   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(
+        Line::from({
+            let mut spans = vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(
+                    " Tab ",
+                    Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+                ),
+                Span::styled("  Change screen   ", Style::default().fg(COLOR_MUTED)),
+                Span::styled(
+                    " ↑↓ ",
+                    Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+                ),
+                Span::styled("  Select agent   ", Style::default().fg(COLOR_MUTED)),
+            ];
+
+            if ctx.agents[ctx.selected_agent_idx].executable_path.is_some() {
+                spans.push(Span::styled(
+                    " s ",
+                    Style::default().fg(Color::Black).bg(color_primary).bold(),
+                ));
+                spans.push(Span::styled("  Edit limit   ", Style::default().fg(COLOR_MUTED)));
+            }
+
+            spans.push(Span::styled(
                 " q ",
                 Style::default().fg(Color::Black).bg(COLOR_DANGER).bold(),
-            ),
-            Span::styled("  Quit", Style::default().fg(COLOR_MUTED)),
-        ]),
+            ));
+            spans.push(Span::styled("  Quit", Style::default().fg(COLOR_MUTED)));
+
+            spans
+        }),
     ];
 
     let docs_para = Paragraph::new(docs_lines).block(
@@ -1580,7 +1583,7 @@ fn draw_settings_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             ),
             Span::styled("  Select   ", Style::default().fg(COLOR_MUTED)),
             Span::styled(
-                " ←→ / Enter ",
+                " Enter / +/- ",
                 Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
             ),
             Span::styled("  Cycle value", Style::default().fg(COLOR_MUTED)),
@@ -1626,14 +1629,16 @@ fn draw_footer(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     match ctx.active_tab {
         1 | 3 => {
             footer_spans.extend(kpill("↑↓", "Select agent", COLOR_DIM));
-            footer_spans.extend(kpill("s", "Edit quota", color_primary));
+            if ctx.agents[ctx.selected_agent_idx].executable_path.is_some() {
+                footer_spans.extend(kpill("s", "Edit quota", color_primary));
+            }
         }
         4 => {
             footer_spans.extend(kpill("↑↓", "Select", COLOR_DIM));
             if ctx.selected_setting_idx == 4 {
                 footer_spans.extend(kpill("Enter", "Open editor", color_primary));
             } else {
-                footer_spans.extend(kpill("←→", "Cycle value", color_primary));
+                footer_spans.extend(kpill("Enter/+/-", "Cycle value", color_primary));
             }
         }
         _ => {
@@ -1674,12 +1679,7 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
     f.render_widget(Clear, modal_rect);
 
     let active_agent = &ctx.agents[ctx.selected_agent_idx];
-    let agent_color = match active_agent.id {
-        AgentId::Codex => COLOR_CODEX,
-        AgentId::OpenCode => COLOR_OPENCODE,
-        AgentId::Agy => COLOR_AGY,
-        AgentId::Zed => COLOR_ZED,
-    };
+    let agent_color = get_agent_color(active_agent.id);
 
     let modal_block = Block::default()
         .borders(Borders::ALL)
@@ -1740,7 +1740,6 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
         " Request Limit:",
         Style::default().fg(COLOR_MUTED),
     )));
-
     let (border_color, text_style, display_text) = if display_val.is_empty() {
         (
             COLOR_DANGER,
@@ -1760,7 +1759,6 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             format!("{}{}", display_val, cursor_suffix),
         )
     };
-
     let field_block = Block::default()
         .borders(Borders::BOTTOM)
         .border_style(Style::default().fg(border_color));
@@ -1777,5 +1775,33 @@ fn draw_budget_modal(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Style::default().fg(COLOR_DANGER).italic(),
         )));
         f.render_widget(warning_p, form_layout[3]);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_ratio_color() {
+        let soft = 0.8;
+        let hard = 1.0;
+
+        // ratio < soft -> COLOR_SUCCESS
+        assert_eq!(ratio_color(0.5, soft, hard), COLOR_SUCCESS);
+        assert_eq!(ratio_color(0.79, soft, hard), COLOR_SUCCESS);
+
+        // ratio == soft -> COLOR_WARN
+        assert_eq!(ratio_color(0.8, soft, hard), COLOR_WARN);
+
+        // soft < ratio < hard -> COLOR_WARN
+        assert_eq!(ratio_color(0.9, soft, hard), COLOR_WARN);
+        assert_eq!(ratio_color(0.99, soft, hard), COLOR_WARN);
+
+        // ratio == hard -> COLOR_DANGER
+        assert_eq!(ratio_color(1.0, soft, hard), COLOR_DANGER);
+
+        // ratio > hard -> COLOR_DANGER
+        assert_eq!(ratio_color(1.1, soft, hard), COLOR_DANGER);
     }
 }

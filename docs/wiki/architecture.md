@@ -8,7 +8,7 @@ This document records the system architecture and Design Decisions (Architecture
 
 ### Core Components
 
-- **Scanner (`agent.rs`):** A background thread that periodically polls local databases (Codex, OpenCode, Zed) and log files (Agy) to update the application state.
+- **Scanner (`agent.rs`):** A background thread that periodically polls local databases (Codex, OpenCode, Zed), config/log files (Agy, Aider, Ollama, Continue, Cody, Supermaven), and telemetry logs to update the application state.
 - **Config Manager (`config.rs`):** Handles persistence of user preferences and custom quota limits using JSON.
 - **UI Engine (`ui.rs`):** A `ratatui`-based rendering engine that provides a multi-tab interactive interface.
 

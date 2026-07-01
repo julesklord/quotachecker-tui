@@ -2,6 +2,7 @@
 mod tests {
     use crate::agent::{base64_decode, decode_jwt_payload};
     use crate::config::AppConfig;
+    use chrono::{Datelike, Duration, Local};
     use serial_test::serial;
     use std::env;
     use std::fs;
@@ -45,6 +46,77 @@ mod tests {
     }
 
     #[test]
+    fn test_check_executable_exists() {
+        use crate::agent::AgentScanner;
+        let result = AgentScanner::check_executable("cargo");
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn test_check_executable_not_exists() {
+        use crate::agent::AgentScanner;
+        let result = AgentScanner::check_executable("this_command_absolutely_does_not_exist_12345");
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_check_executable_fallback_path() {
+        use crate::agent::AgentScanner;
+        use std::env;
+        use std::fs;
+
+        struct HomeEnvGuard {
+            original_home: Option<String>,
+        }
+
+        impl HomeEnvGuard {
+            fn new(temp_home: &std::path::Path) -> Self {
+                let original_home = env::var("HOME").ok();
+                env::set_var("HOME", temp_home);
+                Self { original_home }
+            }
+        }
+
+        impl Drop for HomeEnvGuard {
+            fn drop(&mut self) {
+                if let Some(ref home) = self.original_home {
+                    env::set_var("HOME", home);
+                } else {
+                    env::remove_var("HOME");
+                }
+            }
+        }
+
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let temp_dir = env::temp_dir().join(format!("quotachecker_test_home_{}", timestamp));
+        let bin_dir = temp_dir.join(".local/bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+
+        let _env_guard = HomeEnvGuard::new(&temp_dir);
+
+        let mock_cmd = format!("mock_cmd_for_test_{}", timestamp);
+        let mock_executable = bin_dir.join(&mock_cmd);
+        fs::write(&mock_executable, "#!/bin/sh
+exit 0").unwrap();
+
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = fs::metadata(&mock_executable).unwrap().permissions();
+            perms.set_mode(0o755);
+            fs::set_permissions(&mock_executable, perms).unwrap();
+        }
+
+
+        let result = AgentScanner::check_executable(&mock_cmd);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+        assert_eq!(result, Some(mock_executable.to_string_lossy().to_string()));
+    }
+
+
+    #[test]
     fn test_tier_quota_limits() {
         use crate::agent::UserTier;
         // Verify Codex limits
@@ -86,6 +158,106 @@ mod tests {
     }
 
     #[test]
+    fn test_calculate_seconds_monthly_reset_mid_month() {
+        use crate::agent::calculate_seconds_until_monthly_reset;
+        use chrono::{Local, TimeZone};
+
+        let naive = chrono::NaiveDate::from_ymd_opt(2023, 5, 15)
+            .unwrap()
+            .and_hms_opt(12, 0, 0)
+            .unwrap();
+        let now = Local.from_local_datetime(&naive).single().unwrap();
+
+        let naive_next = chrono::NaiveDate::from_ymd_opt(2023, 6, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let expected_reset = Local.from_local_datetime(&naive_next).single().unwrap();
+
+        let expected_seconds = expected_reset.signed_duration_since(now).num_seconds();
+        assert_eq!(calculate_seconds_until_monthly_reset(now), expected_seconds);
+    }
+
+    #[test]
+    fn test_calculate_seconds_monthly_reset_year_boundary() {
+        use crate::agent::calculate_seconds_until_monthly_reset;
+        use chrono::{Local, TimeZone};
+
+        let naive = chrono::NaiveDate::from_ymd_opt(2023, 12, 15)
+            .unwrap()
+            .and_hms_opt(12, 0, 0)
+            .unwrap();
+        let now = Local.from_local_datetime(&naive).single().unwrap();
+
+        let naive_next = chrono::NaiveDate::from_ymd_opt(2024, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        let expected_reset = Local.from_local_datetime(&naive_next).single().unwrap();
+
+        let expected_seconds = expected_reset.signed_duration_since(now).num_seconds();
+        assert_eq!(calculate_seconds_until_monthly_reset(now), expected_seconds);
+    }
+
+    #[test]
+    fn test_seconds_until_daily_reset() {
+        use crate::agent::seconds_until_daily_reset;
+
+        let seconds = seconds_until_daily_reset();
+
+        // The time until next reset (midnight) should be greater than 0
+        assert!(
+            seconds > 0,
+            "Seconds until reset should be strictly positive"
+        );
+
+        // It shouldn't be more than 25 hours (90,000 seconds) in the worst case (accounting for DST transitions)
+        assert!(
+            seconds <= 90_000,
+            "Seconds until reset should be less than or equal to 25 hours"
+        );
+    }
+
+    #[test]
+    fn test_seconds_until_weekly_reset() {
+        use crate::agent::seconds_until_weekly_reset;
+
+        let seconds = seconds_until_weekly_reset();
+
+        // The returned seconds should be strictly positive
+        assert!(seconds > 0, "Seconds until weekly reset should be positive");
+        assert!(
+            seconds <= 8 * 24 * 3600,
+            "Seconds should not exceed one week"
+        );
+
+        let expected_reset_time = Local::now() + Duration::seconds(seconds);
+
+        let reset_day = (expected_reset_time + Duration::seconds(2)).weekday();
+        assert_eq!(
+            reset_day,
+            chrono::Weekday::Mon,
+            "Reset should happen on a Monday"
+        );
+    }
+
+    #[test]
+    fn test_scan_all_agents() {
+        use crate::agent::{AgentScanner, AgentId};
+        let config = AppConfig::default();
+        let agents = AgentScanner::scan(&config);
+        assert_eq!(agents.len(), 9);
+
+        // Verify IDs are correct in order
+        assert_eq!(agents[0].id, AgentId::Codex);
+        assert_eq!(agents[1].id, AgentId::OpenCode);
+        assert_eq!(agents[2].id, AgentId::Agy);
+        assert_eq!(agents[3].id, AgentId::Zed);
+        assert_eq!(agents[4].id, AgentId::Aider);
+        assert_eq!(agents[5].id, AgentId::Ollama);
+        assert_eq!(agents[6].id, AgentId::Continue);
+        assert_eq!(agents[7].id, AgentId::Cody);
+        assert_eq!(agents[8].id, AgentId::Supermaven);
     #[serial]
     fn test_config_save() {
         let dir = tempdir().unwrap();

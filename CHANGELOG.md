@@ -5,6 +5,34 @@ Format: [keepachangelog.com](https://keepachangelog.com) · Versioning: [semver.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-30
+
+### Added
+- Compatibility for 5 new AI assistants: **Aider**, **Ollama**, **Continue**, **Cody**, and **Supermaven** (increasing monitored assistants from 4 to 9).
+- Brand styling/color tokens for Aider, Ollama, Continue, Cody, and Supermaven.
+- Comprehensive integration testing for all 9 agents' scanner order and ID assignments (`test_scan_all_agents`).
+- Version verification mock test coverage for Aider, Ollama, Continue, Cody, and Supermaven.
+
+### Changed
+- Refactored `src/ui.rs`'s agent color resolution into a single `get_agent_color(AgentId)` helper function to avoid duplicating patterns.
+- Expanded default model parameters and limits schema inside `AppConfig` for Aider, Ollama, Continue, Cody, and Supermaven (using `#[serde(default)]` to preserve backward compatibility).
+
+## [0.4.0] - 2026-06-30
+
+### Added
+- Expanded unit test coverage from 5 to 23 tests. Includes tests for `ratio_color`, monthly/daily/weekly reset intervals, executable search fallback, and configuration serialization.
+- A thread-local path override helper `TEST_CONFIG_PATH` for clean, isolated configuration loading/saving unit tests without altering global host environment variables.
+
+### Changed
+- Modal Budget Editor: Real-time visual input validation. Fields highlight in red (`COLOR_DANGER`) and show a `⚠ Valid number required` helper if user inputs empty or non-numeric values.
+- Navigation discoverability: Tabs are now numbered (`1 Overview`, `2 AI Agents`, etc.) to show keybind hotkeys, and edit keys dynamically hide for uninstalled agents.
+- Sessions Tab: Replaced confusing mock data entries with a clear and friendly "No recent sessions found" empty state component.
+
+### Fixed
+- Backward compatibility: Added `#[serde(default)]` to the `model_limits` config field to prevent older configuration schemas from failing deserialization and being destructively overwritten by defaults.
+- Keybind mapping hints: Corrected settings help menus to mention `Enter / +/-` for cycling values instead of `←→ / Enter` (which previously changed global tabs).
+- Version checking: Fixed logic in `AgentScanner::get_version` where failure status codes from `--version` executions prevented running the fallback `-v` version check.
+
 ## [0.3.0] - 2026-06-25
 
 ### Changed

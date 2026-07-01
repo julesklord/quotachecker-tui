@@ -137,6 +137,26 @@ impl App {
                     config.zed_quota.limit = val;
                     config.zed_quota.custom = true;
                 }
+                AgentId::Aider => {
+                    config.aider_quota.limit = val;
+                    config.aider_quota.custom = true;
+                }
+                AgentId::Ollama => {
+                    config.ollama_quota.limit = val;
+                    config.ollama_quota.custom = true;
+                }
+                AgentId::Continue => {
+                    config.continue_quota.limit = val;
+                    config.continue_quota.custom = true;
+                }
+                AgentId::Cody => {
+                    config.cody_quota.limit = val;
+                    config.cody_quota.custom = true;
+                }
+                AgentId::Supermaven => {
+                    config.supermaven_quota.limit = val;
+                    config.supermaven_quota.custom = true;
+                }
             }
 
             if let Ok(()) = config.save() {
