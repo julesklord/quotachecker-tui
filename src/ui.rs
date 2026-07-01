@@ -1404,29 +1404,37 @@ fn draw_quotas_tab(f: &mut Frame, area: Rect, ctx: &RenderContext) {
             Style::default().fg(color_primary).bold(),
         )]),
         Line::from(""),
-        Line::from(vec![
-            Span::styled("  ", Style::default()),
-            Span::styled(
-                " Tab ",
-                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
-            ),
-            Span::styled("  Change screen   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(
-                " ↑↓ ",
-                Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
-            ),
-            Span::styled("  Select agent   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(
-                " s ",
-                Style::default().fg(Color::Black).bg(color_primary).bold(),
-            ),
-            Span::styled("  Edit limit   ", Style::default().fg(COLOR_MUTED)),
-            Span::styled(
+        Line::from({
+            let mut spans = vec![
+                Span::styled("  ", Style::default()),
+                Span::styled(
+                    " Tab ",
+                    Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+                ),
+                Span::styled("  Change screen   ", Style::default().fg(COLOR_MUTED)),
+                Span::styled(
+                    " ↑↓ ",
+                    Style::default().fg(Color::Black).bg(COLOR_DIM).bold(),
+                ),
+                Span::styled("  Select agent   ", Style::default().fg(COLOR_MUTED)),
+            ];
+
+            if ctx.agents[ctx.selected_agent_idx].executable_path.is_some() {
+                spans.push(Span::styled(
+                    " s ",
+                    Style::default().fg(Color::Black).bg(color_primary).bold(),
+                ));
+                spans.push(Span::styled("  Edit limit   ", Style::default().fg(COLOR_MUTED)));
+            }
+
+            spans.push(Span::styled(
                 " q ",
                 Style::default().fg(Color::Black).bg(COLOR_DANGER).bold(),
-            ),
-            Span::styled("  Quit", Style::default().fg(COLOR_MUTED)),
-        ]),
+            ));
+            spans.push(Span::styled("  Quit", Style::default().fg(COLOR_MUTED)));
+
+            spans
+        }),
     ];
 
     let docs_para = Paragraph::new(docs_lines).block(
